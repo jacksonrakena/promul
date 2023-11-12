@@ -1,6 +1,5 @@
 using LiteNetLib.Utils;
-using Promul.Relay.Structs;
-namespace Promul;
+namespace Promul.Server.Relay.Structs;
 
 public static class NetDataExtensions
 {

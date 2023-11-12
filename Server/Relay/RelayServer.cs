@@ -2,8 +2,8 @@
 using System.Net.Sockets;
 using LiteNetLib;
 using LiteNetLib.Utils;
-using Promul.Relay.Structs;
-namespace Promul.Relay;
+using Promul.Server.Relay.Structs;
+namespace Promul.Server.Relay;
 
 public class RelayServer : INetEventListener
 {

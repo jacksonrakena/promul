@@ -1,5 +1,5 @@
-﻿using Promul.Relay;
-namespace Promul;
+﻿using Promul.Server.Relay;
+namespace Promul.Server;
 
 public class Program
 {

@@ -1,5 +1,4 @@
-using Promul.Relay.Structs;
-namespace Promul;
+namespace Promul.Server.Relay.Structs;
 
 public struct RelayControlMessage {
     public RelayControlMessageType Type { get; set; }
