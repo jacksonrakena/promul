@@ -6,7 +6,7 @@ using LiteNetLib.Utils;
 using Unity.Netcode;
 using UnityEngine;
 
-namespace AceInTheHole.Network.Promul
+namespace Promul.Transport
 {
     public class PromulTransport : NetworkTransport, INetEventListener
     {
@@ -16,12 +16,12 @@ namespace AceInTheHole.Network.Promul
             Server,
             Client
         }
-        
+
         [Tooltip("The port of the relay server.")]
         public ushort Port = 7777;
         [Tooltip("The address of the relay server.")]
         public string Address = "127.0.0.1";
-        
+
         [Tooltip("Interval between ping packets used for detecting latency and checking connection, in seconds")]
         public float PingInterval = 1f;
         [Tooltip("Maximum duration for a connection to survive without receiving packets, in seconds")]
@@ -38,12 +38,12 @@ namespace AceInTheHole.Network.Promul
         public int SimulateMinLatency = 0;
         [Tooltip("Simulated maximum additional latency for packets in milliseconds (0 for no simulation")]
         public int SimulateMaxLatency = 0;
-        
+
         NetManager m_NetManager;
 
         public override ulong ServerClientId => 0;
         HostType m_HostType;
-        
+
         void OnValidate()
         {
             PingInterval = Math.Max(0, PingInterval);
@@ -70,10 +70,10 @@ namespace AceInTheHole.Network.Promul
             writer.Put((byte)0x00);
             writer.Put(clientId);
             writer.Put(data.Array, data.Offset, data.Count);
-            
+
             relayPeer?.Send(writer, ConvertNetworkDelivery(qos));
         }
-        
+
         void INetEventListener.OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod)
         {
             var control = reader.GetByte();
@@ -83,29 +83,29 @@ namespace AceInTheHole.Network.Promul
             {
                 // YOU_ARE_READY_TO_REQUEST_LOBBY_JOIN
                 case 0x10:
-                {
-                    InvokeOnTransportEvent(NetworkEvent.Connect, author, default, Time.time);
-                    break;
-                }
+                    {
+                        InvokeOnTransportEvent(NetworkEvent.Connect, author, default, Time.time);
+                        break;
+                    }
                 // CLIENT_WISHES_TO_JOIN_YOUR_LOBBY
                 case 0x11:
-                {
-                    InvokeOnTransportEvent(NetworkEvent.Connect, author, default, Time.time);
-                    break;
-                }
+                    {
+                        InvokeOnTransportEvent(NetworkEvent.Connect, author, default, Time.time);
+                        break;
+                    }
                 // A client has disconnected from the relay.
                 case 0x12:
-                {
-                    InvokeOnTransportEvent(NetworkEvent.Disconnect, author, default, Time.time);
-                    break;
-                }
+                    {
+                        InvokeOnTransportEvent(NetworkEvent.Disconnect, author, default, Time.time);
+                        break;
+                    }
                 // RELAYED_DATA
                 case 0x00:
-                {
-                    var data= reader.GetRemainingBytes();
-                    InvokeOnTransportEvent(NetworkEvent.Data, author, data, Time.time);
-                    break;
-                }
+                    {
+                        var data = reader.GetRemainingBytes();
+                        InvokeOnTransportEvent(NetworkEvent.Data, author, data, Time.time);
+                        break;
+                    }
                 default:
                     Debug.LogError("Unknown Promul control byte " + control);
                     break;
@@ -125,7 +125,7 @@ namespace AceInTheHole.Network.Promul
         bool ConnectToRelayServer()
         {
             if (!m_NetManager.Start()) return false;
-            relayPeer = m_NetManager.Connect(Address,Port, string.Empty);
+            relayPeer = m_NetManager.Connect(Address, Port, string.Empty);
             return true;
         }
 
@@ -199,14 +199,14 @@ namespace AceInTheHole.Network.Promul
         }
         void INetEventListener.OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
-            if (disconnectInfo.Reason != DisconnectReason.DisconnectPeerCalled) 
+            if (disconnectInfo.Reason != DisconnectReason.DisconnectPeerCalled)
                 InvokeOnTransportEvent(NetworkEvent.TransportFailure, 0, ArraySegment<byte>.Empty, Time.time);
         }
 
         void INetEventListener.OnPeerConnected(NetPeer peer)
         {
         }
-        
+
         void INetEventListener.OnNetworkError(IPEndPoint endPoint, SocketError socketError)
         {
         }
@@ -218,7 +218,7 @@ namespace AceInTheHole.Network.Promul
         void INetEventListener.OnNetworkLatencyUpdate(NetPeer peer, int latency)
         {
         }
-        
+
         static int SecondsToMilliseconds(float seconds)
         {
             return (int)Mathf.Ceil(seconds * 1000);
