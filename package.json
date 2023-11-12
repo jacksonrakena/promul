@@ -1,9 +1,9 @@
 {
   "name": "com.fireworkeyes.netcode.transport.promul",
   "displayName": "Promul Transport for Netcode for GameObjects",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "unity": "2019.4",
-  "description": "ENET Transport for Netcode for GameObjects",
+  "description": "Promul transport for Netcode for GameObjects.",
   "author": "Jackson Rakena (transport/relay server), Ruslan Pyrch (protocol)",
   "dependencies": {}
 }
