@@ -6,9 +6,10 @@ Promul serves as a free and open-source alternative to [Unity Relay](https://uni
 ## Setup
 #### Relay server
 Clone this repository and build and run the program under [/Server](/Server). Promul will bind on port 4098.
+
 #### Relay client (Transport)
 Install the transport by adding it in the Unity Package Manager by git URL:  
-`https://github.com/jacksonrakena/Promul.git?path=/Transport/`
+`https://github.com/jacksonrakena/Promul.git`
   
 Next, add `PromulTransport` to your NetworkManager GameObject. Set the `Address` and `Port` to the address and port of your relay server.  
 
