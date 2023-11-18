@@ -1,8 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Promul.Relay", "Server~\Promul.Relay\Promul.Relay.csproj", "{9008007B-7B59-42AA-A4A9-C95536921E61}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Promul.Api", "Server~\Promul.Api\Promul.Api.csproj", "{EDB23D95-CCE1-4B0A-A5E0-B25383D6F647}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Promul.Server", "Server~\Promul.Server.csproj", "{EDB23D95-CCE1-4B0A-A5E0-B25383D6F647}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Promul.Common", "Common\Promul.Common.csproj", "{009A3A68-30A0-44EB-9B42-8FCB6BD89195}"
 EndProject
@@ -14,10 +12,6 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{9008007B-7B59-42AA-A4A9-C95536921E61}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{9008007B-7B59-42AA-A4A9-C95536921E61}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{9008007B-7B59-42AA-A4A9-C95536921E61}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{9008007B-7B59-42AA-A4A9-C95536921E61}.Release|Any CPU.Build.0 = Release|Any CPU
 		{EDB23D95-CCE1-4B0A-A5E0-B25383D6F647}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{EDB23D95-CCE1-4B0A-A5E0-B25383D6F647}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EDB23D95-CCE1-4B0A-A5E0-B25383D6F647}.Release|Any CPU.ActiveCfg = Release|Any CPU

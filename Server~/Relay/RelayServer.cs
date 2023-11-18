@@ -2,7 +2,6 @@
 using System.Net.Sockets;
 using System.Text;
 using LiteNetLib;
-using LiteNetLib.Utils;
 using Promul.Common.Structs;
 using Promul.Server.Relay.Sessions;
 namespace Promul.Server.Relay;
@@ -11,21 +10,33 @@ public class RelayServer : INetEventListener
 {
     public NetManager NetManager { get; }
 
-    readonly Dictionary<string, RelaySession> sessions = new Dictionary<string, RelaySession>()
-    {
-        { "TEST", new RelaySession("TEST") }
-    };
+    readonly Dictionary<string, RelaySession> sessions = new Dictionary<string, RelaySession>();
     
     readonly Dictionary<NetPeer, RelaySession> sessionsByPeer = new Dictionary<NetPeer, RelaySession>();
+
+    readonly ILogger<RelayServer> _logger;
+    readonly ILoggerFactory _factory;
     
-    public RelayServer()
+    public RelayServer(ILogger<RelayServer> logger, ILoggerFactory factory)
     {
+        _logger = logger;
+        _factory = factory;
         NetManager = new NetManager(this)
         {
             PingInterval = 1000,
             //ReconnectDelay = 500,
             DisconnectTimeout = 10000
         };
+    }
+
+    public void CreateSession(string joinCode)
+    {
+        sessions[joinCode] = new RelaySession(joinCode, _factory.CreateLogger<RelaySession>());
+    }
+
+    public RelaySession? GetSession(string joinCode)
+    {
+        return sessions.GetValueOrDefault(joinCode);
     }
 
     public void Start()
@@ -38,11 +49,12 @@ public class RelayServer : INetEventListener
     {
         var packet = reader.Get();
 
+        const string format = "Disconnecting {} ({}) because {}";
         if (!sessionsByPeer.TryGetValue(peer, out var session))
         {
             if (packet.Type != RelayControlMessageType.Hello)
             {
-                Console.WriteLine($"Disconnecting {peer.Id} because they are not attached to a session and they did not send HELLO.");
+                _logger.LogInformation(format, peer.Id, peer.EndPoint, "because they are not attached to a session and they did not send HELLO.");
                 peer.Disconnect();
                 return;
             }
@@ -50,7 +62,7 @@ public class RelayServer : INetEventListener
             var key = Encoding.Default.GetString(packet.Data);
             if (!sessions.TryGetValue(key, out var keyedSession))
             {
-                Console.WriteLine($"Disconnecting {peer.Id} because they requested to join a session that does not exist.");
+                _logger.LogInformation(format, peer.Id, peer.EndPoint, "because they requested to join a session that does not exist.");
                 peer.Disconnect();
                 return;
             }
@@ -70,11 +82,11 @@ public class RelayServer : INetEventListener
     
     public void OnPeerConnected(NetPeer peer)
     {
-        Console.WriteLine($"Connected to {peer.EndPoint}, assigned host");
+        _logger.LogInformation($"Connected to {peer.EndPoint}");
     }
     public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
     {
-        Console.WriteLine($"Peer {peer.Id} disconnected: {disconnectInfo.Reason} {disconnectInfo.SocketErrorCode}");
+        _logger.LogInformation($"Peer {peer.Id} disconnected: {disconnectInfo.Reason} {disconnectInfo.SocketErrorCode}");
         if (sessionsByPeer.TryGetValue(peer, out var session))
         {
             session.OnLeave(peer);
@@ -93,4 +105,5 @@ public class RelayServer : INetEventListener
     public void OnNetworkLatencyUpdate(NetPeer peer, int latency)
     {
     }
+    
 }

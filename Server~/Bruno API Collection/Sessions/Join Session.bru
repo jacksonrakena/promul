@@ -1,0 +1,15 @@
+meta {
+  name: Join Session
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/session/join
+  body: json
+  auth: none
+}
+
+body:json {
+  TEST
+}

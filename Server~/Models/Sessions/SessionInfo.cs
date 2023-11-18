@@ -1,6 +1,6 @@
-namespace Promul.Api;
+namespace Promul.Server.Models.Sessions;
 
-public struct SessionCreateInfo
+public struct SessionInfo
 {
     public string JoinCode { get; set; }
     public string RelayAddress { get; set; }
