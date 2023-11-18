@@ -10,9 +10,8 @@ public class RelayServer : INetEventListener
 {
     public NetManager NetManager { get; }
 
-    readonly Dictionary<string, RelaySession> sessions = new Dictionary<string, RelaySession>();
-    
-    readonly Dictionary<NetPeer, RelaySession> sessionsByPeer = new Dictionary<NetPeer, RelaySession>();
+    readonly Dictionary<string, RelaySession> _sessionsByCode = new Dictionary<string, RelaySession>();
+    readonly Dictionary<int, RelaySession> _sessionsByPeer = new Dictionary<int, RelaySession>();
 
     readonly ILogger<RelayServer> _logger;
     readonly ILoggerFactory _factory;
@@ -21,28 +20,28 @@ public class RelayServer : INetEventListener
     {
         _logger = logger;
         _factory = factory;
-        NetManager = new NetManager(this)
-        {
-            PingInterval = 1000,
-            //ReconnectDelay = 500,
-            DisconnectTimeout = 10000
-        };
+        NetManager = new NetManager(this);
     }
 
     public void CreateSession(string joinCode)
     {
-        sessions[joinCode] = new RelaySession(joinCode, _factory.CreateLogger<RelaySession>());
+        _sessionsByCode[joinCode] = new RelaySession(joinCode, this, _factory.CreateLogger<RelaySession>());
     }
 
     public RelaySession? GetSession(string joinCode)
     {
-        return sessions.GetValueOrDefault(joinCode);
+        return _sessionsByCode.GetValueOrDefault(joinCode);
     }
-
-    public void Start()
+    
+    public void DestroySession(RelaySession session)
     {
-        NetManager.IPv6Enabled = false;
-        NetManager.Start(IPAddress.Any, IPAddress.Any, 4098);
+        foreach (var peer in session.Peers)
+        {
+            _sessionsByPeer.Remove(peer.Id);
+        }
+        
+        session.DisconnectAll();
+        _sessionsByCode.Remove(session.JoinCode);
     }
 
     public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
@@ -50,25 +49,10 @@ public class RelayServer : INetEventListener
         var packet = reader.Get();
 
         const string format = "Disconnecting {} ({}) because {}";
-        if (!sessionsByPeer.TryGetValue(peer, out var session))
+        if (!_sessionsByPeer.TryGetValue(peer.Id, out var session))
         {
-            if (packet.Type != RelayControlMessageType.Hello)
-            {
-                _logger.LogInformation(format, peer.Id, peer.EndPoint, "because they are not attached to a session and they did not send HELLO.");
-                peer.Disconnect();
-                return;
-            }
-
-            var key = Encoding.Default.GetString(packet.Data);
-            if (!sessions.TryGetValue(key, out var keyedSession))
-            {
-                _logger.LogInformation(format, peer.Id, peer.EndPoint, "because they requested to join a session that does not exist.");
-                peer.Disconnect();
-                return;
-            }
-            keyedSession.OnJoin(peer);
-            sessionsByPeer[peer] = keyedSession;
-            
+            _logger.LogInformation(format, peer.Id, peer.EndPoint, "because they are not attached to a session.");
+            peer.Disconnect();
             return;
         }
 
@@ -77,7 +61,19 @@ public class RelayServer : INetEventListener
     
     public void OnConnectionRequest(ConnectionRequest request)
     {
-        request.Accept();
+        var joinCode = request.Data.GetString();
+        
+        if (!_sessionsByCode.TryGetValue(joinCode, out var keyedSession))
+        {
+            const string format = "Rejecting {} because {}";
+            _logger.LogInformation(format, request.RemoteEndPoint, "because they requested to join a session that does not exist.");
+            request.RejectForce();
+            return;
+        }
+
+        var peer = request.Accept();
+        keyedSession.OnJoin(peer);
+        _sessionsByPeer[peer.Id] = keyedSession;
     }
     
     public void OnPeerConnected(NetPeer peer)
@@ -87,10 +83,10 @@ public class RelayServer : INetEventListener
     public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
     {
         _logger.LogInformation($"Peer {peer.Id} disconnected: {disconnectInfo.Reason} {disconnectInfo.SocketErrorCode}");
-        if (sessionsByPeer.TryGetValue(peer, out var session))
+        if (_sessionsByPeer.TryGetValue(peer.Id, out var session))
         {
             session.OnLeave(peer);
-            sessionsByPeer.Remove(peer);
+            _sessionsByPeer.Remove(peer.Id);
         }
     }
     

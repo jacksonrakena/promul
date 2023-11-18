@@ -64,21 +64,26 @@ namespace Promul.Runtime
 
         public override bool IsSupported => Application.platform != RuntimePlatform.WebGLPlayer;
 
-        public NetPeer relayPeer;
-        public override void Send(ulong clientId, ArraySegment<byte> data, NetworkDelivery qos)
+        NetPeer? _relayPeer;
+
+        public void SendControl(RelayControlMessage rcm, NetworkDelivery qos)
         {
             var writer = new NetDataWriter();
+            writer.Put(rcm);
+            _relayPeer?.Send(writer, ConvertNetworkDelivery(qos));
+        }
+        
+        public override void Send(ulong clientId, ArraySegment<byte> data, NetworkDelivery qos)
+        {
             var cpy = new byte[data.Count];
             
             Array.Copy(data.Array, data.Offset, cpy, 0, data.Count);
-            writer.Put(new RelayControlMessage
+            SendControl(new RelayControlMessage
             {
                 Type = RelayControlMessageType.Data,
                 AuthorClientId = clientId,
                 Data = cpy
-            });
-
-            relayPeer?.Send(writer, ConvertNetworkDelivery(qos));
+            }, qos);
         }
 
         void INetEventListener.OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod)
@@ -87,25 +92,20 @@ namespace Promul.Runtime
             var author = message.AuthorClientId;
             switch (message.Type)
             {
-                // YOU_ARE_READY_TO_REQUEST_LOBBY_JOIN
+                // Either we are host and a client has connected,
+                // or we're a client and we're connected.
                 case RelayControlMessageType.Connected:
                     {
                         InvokeOnTransportEvent(NetworkEvent.Connect, author, default, Time.time);
                         break;
                     }
-                // CLIENT_WISHES_TO_JOIN_YOUR_LOBBY
-                case RelayControlMessageType.ClientConnected:
-                    {
-                        InvokeOnTransportEvent(NetworkEvent.Connect, author, default, Time.time);
-                        break;
-                    }
                 // A client has disconnected from the relay.
-                case RelayControlMessageType.ClientDisconnected:
+                case RelayControlMessageType.Disconnected:
                     {
                         InvokeOnTransportEvent(NetworkEvent.Disconnect, author, default, Time.time);
                         break;
                     }
-                // RELAYED_DATA
+                // Relayed data
                 case RelayControlMessageType.Data:
                     {
                         InvokeOnTransportEvent(NetworkEvent.Data, author, new ArraySegment<byte>(message.Data), Time.time);
@@ -130,7 +130,9 @@ namespace Promul.Runtime
         bool ConnectToRelayServer()
         {
             if (!m_NetManager.Start()) return false;
-            relayPeer = m_NetManager.Connect(Address, Port, string.Empty);
+            var joinPacket = new NetDataWriter();
+            joinPacket.Put("TEST");
+            _relayPeer = m_NetManager.Connect(Address, Port, joinPacket);
             return true;
         }
 
@@ -148,25 +150,25 @@ namespace Promul.Runtime
 
         public override void DisconnectRemoteClient(ulong clientId)
         {
-            // TODO: Will need to implement a control type to disconnect a remote client
+            SendControl(new RelayControlMessage {Type = RelayControlMessageType.KickFromRelay, AuthorClientId = clientId, Data = Array.Empty<byte>() }, NetworkDelivery.Reliable);
         }
 
         public override void DisconnectLocalClient()
         {
             m_NetManager.DisconnectAll();
-            relayPeer = null;
+            _relayPeer = null;
         }
 
         public override ulong GetCurrentRtt(ulong clientId)
         {
-            if (relayPeer != null) return (ulong)relayPeer.Ping * 2;
+            if (_relayPeer != null) return (ulong)_relayPeer.Ping * 2;
             return 0;
         }
 
         public override void Shutdown()
         {
             m_NetManager?.Stop();
-            relayPeer = null;
+            _relayPeer = null;
             m_HostType = HostType.None;
         }
 
@@ -200,7 +202,7 @@ namespace Promul.Runtime
         }
         void INetEventListener.OnConnectionRequest(ConnectionRequest request)
         {
-            request.Accept();
+            request.RejectForce();
         }
         void INetEventListener.OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
@@ -211,14 +213,6 @@ namespace Promul.Runtime
 
         void INetEventListener.OnPeerConnected(NetPeer peer)
         {
-            var writer = new NetDataWriter();
-            writer.Put(new RelayControlMessage
-            {
-                Type = RelayControlMessageType.Hello,
-                AuthorClientId = 0,
-                Data = Encoding.Default.GetBytes("TEST")
-            });
-            peer.Send(writer, DeliveryMethod.ReliableOrdered);
         }
 
         void INetEventListener.OnNetworkError(IPEndPoint endPoint, SocketError socketError)

@@ -6,25 +6,21 @@ namespace Promul.Common.Structs
    * Bidirectional. Relayed data.
    */
   Data = 0x00,
-  
-  /*
-   * [Client|Server] -> Relay. Identifying.
-   */
-  Hello = 0x01,
     
   /*
-   * Relay -> Client Only. You are connected to the server.
+   * Relay -> Host: A client has connected to the relay.
+   * Relay -> Client: You are connected to the relay.
    */
   Connected = 0x10,
     
   /*
-   * Relay -> Server Only. A client has disconnected from the relay.
+   * Relay -> Host: A client has disconnected from the relay.
    */
-  ClientDisconnected = 0x12,
-    
+  Disconnected = 0x12,
+  
   /*
-   * Relay -> Server Only. A client has disconnected from the relay.
+   * Host -> Relay: Requesting the relay disconnect a member of the relay.
    */
-  ClientConnected = 0x11
+  KickFromRelay = 0x01
  }
 }

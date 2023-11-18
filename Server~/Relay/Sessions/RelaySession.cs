@@ -11,12 +11,16 @@ public class RelaySession
     public string JoinCode { get; }
 
     readonly ILogger<RelaySession> _logger;
+    readonly RelayServer _server;
 
-    public RelaySession(string joinCode, ILogger<RelaySession> logger)
+    public RelaySession(string joinCode, RelayServer server, ILogger<RelaySession> logger)
     {
         _logger = logger;
         JoinCode = joinCode;
+        _server = server;
     }
+
+    public IEnumerable<NetPeer> Peers => _connections.Values;
 
     public void OnReceive(NetPeer from, RelayControlMessage message, DeliveryMethod method)
     {
@@ -26,7 +30,30 @@ public class RelaySession
             return;
         }
 
-        Send(dest, new RelayControlMessage { Type = RelayControlMessageType.Data, AuthorClientId = (ulong)from.Id, Data = message.Data }, method);
+        switch (message.Type)
+        {
+            case RelayControlMessageType.Data:
+                Send(dest, new RelayControlMessage { Type = RelayControlMessageType.Data, AuthorClientId = (ulong)from.Id, Data = message.Data }, method);
+                break;
+            case RelayControlMessageType.KickFromRelay:
+                var target = message.AuthorClientId;
+                if (from.Id == host)
+                {
+                    if (_connections.TryGetValue((int)target, out var targetPeer))
+                    {
+                        targetPeer.Disconnect();
+                        LogInformation($"Host {from.Id} successfully kicked {target}");
+                    }
+                }
+                else LogInformation($"Client {from.Id} tried to illegally kick {target}!");
+                break;
+            case RelayControlMessageType.Connected:
+            case RelayControlMessageType.Disconnected:
+            default:
+                LogInformation($"Ignoring invalid message {message.Type:G} from {from.Id}");
+                break;
+        }
+
     }
 
     private void Send(NetPeer to, RelayControlMessage message, DeliveryMethod method)
@@ -50,7 +77,7 @@ public class RelaySession
             
             Send(HostPeer!, new RelayControlMessage()
             {
-                Type = RelayControlMessageType.ClientConnected,
+                Type = RelayControlMessageType.Connected,
                 AuthorClientId = (ulong) peer.Id,
                 Data = Array.Empty<byte>()
             }, DeliveryMethod.ReliableOrdered);
@@ -64,7 +91,7 @@ public class RelaySession
         }
     }
 
-    public bool OnLeave(NetPeer peer)
+    public void OnLeave(NetPeer peer)
     {
         LogInformation($"{peer.Id} has left");
         _connections.Remove(peer.Id);
@@ -72,26 +99,29 @@ public class RelaySession
         {
             LogInformation("Host has left, resetting");
             host = null;
-            foreach (var con in _connections.Values)
-            {
-                con.Disconnect();
-            }
-            _connections.Clear();
-            return true;
+            _server.DestroySession(this);
+            return;
         }
         if (host != null)
         {
             Send(HostPeer!, new RelayControlMessage
             {
-                Type = RelayControlMessageType.ClientDisconnected,
+                Type = RelayControlMessageType.Disconnected,
                 AuthorClientId = (ulong) peer.Id,
                 Data = Array.Empty<byte>()
             }, DeliveryMethod.ReliableOrdered);
         }
-        
-        return false;
     }
 
+    public void DisconnectAll()
+    {
+        foreach (var con in _connections.Values)
+        {
+            con.Disconnect();
+        }
+        _connections.Clear();
+    }
+    
     private void LogInformation(string message)
     {
         _logger.LogInformation("[{}] {}", this, message);
