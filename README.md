@@ -25,21 +25,36 @@ Promul uses its own wire protocol over LibNetLib. The protocol is shown in the f
 ```mermaid
 sequenceDiagram
     autonumber
-    Host (ID 0)->>+Relay: UDP Connect
+    Host (ID 0)->>+Relay API: PUT /session/create
+    Relay API->>Relay: Creates session
+    Relay API->>-Host (ID 0): Sends join code "KDS92F" + connection info
+    
+    Host (ID 0)->>Relay: UDP Connect
+    Host (ID 0)->>Relay: 0x01 HELLO KDS92F
+    Client (ID 1)->>+Relay API: PUT /session/join KDS92F
+    note right of Relay API: Join code is transferred out-of-band
+    Relay API->>-Client (ID 1): Sends connection address and port
+
     Client (ID 1)->>+Relay: UDP Connect
-    Relay->>+Host (ID 0): 0x11 CLIENT_CONNECTED
+    Client (ID 1)->>Relay: 0x01 HELLO KDS92F
+    Relay->>Host (ID 0): 0x11 CLIENT_CONNECTED
     Relay->>-Client (ID 1): 0x10 CONNECTED
+
     rect rgba(0, 0, 255, .1)
             note right of Relay: Data is now relayed by 0x00 DATA messages
     Client (ID 1)->>+Relay: 0x00 DATA, target=0
-    Relay-->>+Host (ID 0): 0x00 DATA, author=1
+    Relay-->>-Host (ID 0): 0x00 DATA, author=1
     Host (ID 0)->>+Relay: 0x00 DATA, target=1,
-    Relay->>+Client (ID 1): 0x00 DATA, author=0
+    Relay->>-Client (ID 1): 0x00 DATA, author=0
     note right of Host (ID 0): author field becomes target when sending to relay
     end
+
     Client (ID 1)--xRelay: Connection lost
     Relay->>+Host (ID 0): 0x12 CLIENT_DISCONNECTED
     note right of Relay: Relay notifies host of disconnection
+    
+    Host (ID 0)--xRelay: Connection lost
+    Relay->>Relay API: Destroys session
 ```
 ## Copyright
 &copy; 2023 Firework Eyes Studio (NZBN 9429048922678) under the MIT License.
