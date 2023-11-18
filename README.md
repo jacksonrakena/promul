@@ -29,14 +29,12 @@ sequenceDiagram
     Relay API->>Relay: Creates session
     Relay API->>-Host (ID 0): Sends join code "KDS92F" + connection info
     
-    Host (ID 0)->>Relay: UDP Connect
-    Host (ID 0)->>Relay: 0x01 HELLO KDS92F
+    Host (ID 0)->>Relay: UDP Connect (KDS92F)
     Client (ID 1)->>+Relay API: PUT /session/join KDS92F
     note right of Relay API: Join code is transferred out-of-band
     Relay API->>-Client (ID 1): Sends connection address and port
 
-    Client (ID 1)->>+Relay: UDP Connect
-    Client (ID 1)->>Relay: 0x01 HELLO KDS92F
+    Client (ID 1)->>+Relay: UDP Connect (KDS92F)
     Relay->>Host (ID 0): 0x11 CLIENT_CONNECTED
     Relay->>-Client (ID 1): 0x10 CONNECTED
 
