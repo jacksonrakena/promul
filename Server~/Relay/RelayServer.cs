@@ -23,6 +23,8 @@ public class RelayServer : INetEventListener
         NetManager = new NetManager(this);
     }
 
+    public Dictionary<string, RelaySession> GetAllSessions() => _sessionsByCode;
+
     public void CreateSession(string joinCode)
     {
         _sessionsByCode[joinCode] = new RelaySession(joinCode, this, _factory.CreateLogger<RelaySession>());

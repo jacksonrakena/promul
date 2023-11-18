@@ -7,7 +7,7 @@ public class RelaySession
 {
     readonly Dictionary<int, NetPeer> _connections = new Dictionary<int, NetPeer>();
     int? host = null;
-    NetPeer? HostPeer => host != null ? _connections[host.Value] : null;
+    public NetPeer? HostPeer => host != null ? _connections[host.Value] : null;
     public string JoinCode { get; }
 
     readonly ILogger<RelaySession> _logger;
@@ -41,6 +41,7 @@ public class RelaySession
                 {
                     if (_connections.TryGetValue((int)target, out var targetPeer))
                     {
+                        _connections.Remove((int)target);
                         targetPeer.Disconnect();
                         LogInformation($"Host {from.Id} successfully kicked {target}");
                     }
@@ -94,22 +95,25 @@ public class RelaySession
     public void OnLeave(NetPeer peer)
     {
         LogInformation($"{peer.Id} has left");
-        _connections.Remove(peer.Id);
-        if (host == peer.Id)
+        if (_connections.ContainsKey(peer.Id))
         {
-            LogInformation("Host has left, resetting");
-            host = null;
-            _server.DestroySession(this);
-            return;
-        }
-        if (host != null)
-        {
-            Send(HostPeer!, new RelayControlMessage
+            _connections.Remove(peer.Id);
+            if (host == peer.Id)
             {
-                Type = RelayControlMessageType.Disconnected,
-                AuthorClientId = (ulong) peer.Id,
-                Data = Array.Empty<byte>()
-            }, DeliveryMethod.ReliableOrdered);
+                LogInformation("Host has left, resetting");
+                host = null;
+                _server.DestroySession(this);
+                return;
+            }
+            if (host != null)
+            {
+                Send(HostPeer!, new RelayControlMessage
+                {
+                    Type = RelayControlMessageType.Disconnected,
+                    AuthorClientId = (ulong) peer.Id,
+                    Data = Array.Empty<byte>()
+                }, DeliveryMethod.ReliableOrdered);
+            }   
         }
     }
 

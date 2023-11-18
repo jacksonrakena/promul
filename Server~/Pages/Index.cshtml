@@ -1,0 +1,45 @@
+﻿@page
+@inject RelayServer relayServer
+@using Promul.Server.Relay
+@model Promul.Server.Pages.Index
+
+@{
+    Layout = "Layout";
+}
+
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <title></title>
+</head>
+<body>
+<div>
+    <table class="table">
+        <thead>
+        <tr>
+            <th>
+                Join code (ID)
+            </th>
+            <th>
+                Number of players
+            </th>
+            <th>
+                Host IP
+            </th>
+        </tr>
+        </thead>
+        <tbody>
+            @foreach (var session in relayServer.GetAllSessions())
+            {
+                <tr>
+                    <td>@session.Key</td>
+                    <td>@session.Value.Peers.Count()</td>
+                    <td>@(session.Value.HostPeer?.EndPoint?.ToString() ?? "None assigned")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+</body>
+</html>
