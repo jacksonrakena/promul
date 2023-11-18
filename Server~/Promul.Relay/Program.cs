@@ -15,7 +15,7 @@ public class Program
         Console.WriteLine($"Listening on port {relayServer.NetManager.LocalPort}");
         while (!stopping)
         {
-            //relayServer.NetManager.PollEvents();
+            relayServer.NetManager.PollEvents();
             Thread.Sleep(15);
         }
         relayServer.NetManager.Stop();

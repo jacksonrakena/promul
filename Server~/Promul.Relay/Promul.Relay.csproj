@@ -9,8 +9,9 @@
         <RootNamespace>Promul.Server</RootNamespace>
     </PropertyGroup>
 
+
     <ItemGroup>
-        <ProjectReference Include="..\Promul.Common\Promul.Common.csproj" />
+        <ProjectReference Include="..\..\Common\Promul.Common.csproj" />
     </ItemGroup>
 
 </Project>

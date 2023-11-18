@@ -1,8 +1,9 @@
 {
-    "name": "Promul Transport for Netcode for GameObjects",
+    "name": "Promul.Runtime",
     "rootNamespace": "Promul.Runtime",
     "references": [
-        "GUID:1491147abca9d7d4bb7105af628b223e"
+        "GUID:1a708d929450cf244aefd140b1190d9a",
+        "Unity.Netcode.Runtime"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

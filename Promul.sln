@@ -1,12 +1,12 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Promul.Relay", "Promul.Relay\Promul.Relay.csproj", "{9008007B-7B59-42AA-A4A9-C95536921E61}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Promul.Relay", "Server~\Promul.Relay\Promul.Relay.csproj", "{9008007B-7B59-42AA-A4A9-C95536921E61}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Promul.Api", "Promul.Api\Promul.Api.csproj", "{EDB23D95-CCE1-4B0A-A5E0-B25383D6F647}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Promul.Api", "Server~\Promul.Api\Promul.Api.csproj", "{EDB23D95-CCE1-4B0A-A5E0-B25383D6F647}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Promul.Common", "Promul.Common\Promul.Common.csproj", "{009A3A68-30A0-44EB-9B42-8FCB6BD89195}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Promul.Common", "Common\Promul.Common.csproj", "{009A3A68-30A0-44EB-9B42-8FCB6BD89195}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Promul.Runtime", "Promul.Runtime\Promul.Runtime.csproj", "{29457397-4CEF-4E36-92C7-F3E1101CDBA7}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Promul.Runtime", "Runtime\Promul.Runtime.csproj", "{29457397-4CEF-4E36-92C7-F3E1101CDBA7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

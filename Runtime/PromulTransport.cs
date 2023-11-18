@@ -3,6 +3,8 @@ using System.Net;
 using System.Net.Sockets;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using Promul.Common.Structs;
+using Unity.Netcode;
 using UnityEngine;
 namespace Promul.Runtime
 {
@@ -65,47 +67,52 @@ namespace Promul.Runtime
         public override void Send(ulong clientId, ArraySegment<byte> data, NetworkDelivery qos)
         {
             var writer = new NetDataWriter();
-            writer.Put((byte)0x00);
-            writer.Put(clientId);
-            writer.Put(data.Array, data.Offset, data.Count);
+            var cpy = new byte[data.Count];
+            
+            Array.Copy(data.Array, data.Offset, cpy, 0, data.Count);
+            writer.Put(new RelayControlMessage
+            {
+                Type = RelayControlMessageType.Data,
+                AuthorClientId = clientId,
+                Data = cpy
+            });
 
             relayPeer?.Send(writer, ConvertNetworkDelivery(qos));
         }
 
         void INetEventListener.OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod)
         {
-            var control = reader.GetByte();
-            var author = reader.GetULong();
-
-            switch (control)
+            var message = reader.Get();
+            var author = message.AuthorClientId;
+            switch (message.Type)
             {
                 // YOU_ARE_READY_TO_REQUEST_LOBBY_JOIN
-                case 0x10:
+                case RelayControlMessageType.Connected:
                     {
                         InvokeOnTransportEvent(NetworkEvent.Connect, author, default, Time.time);
                         break;
                     }
                 // CLIENT_WISHES_TO_JOIN_YOUR_LOBBY
-                case 0x11:
+                case RelayControlMessageType.ClientConnected:
                     {
                         InvokeOnTransportEvent(NetworkEvent.Connect, author, default, Time.time);
                         break;
                     }
                 // A client has disconnected from the relay.
-                case 0x12:
+                case RelayControlMessageType.ClientDisconnected:
                     {
                         InvokeOnTransportEvent(NetworkEvent.Disconnect, author, default, Time.time);
                         break;
                     }
                 // RELAYED_DATA
-                case 0x00:
+                case RelayControlMessageType.Data:
                     {
                         var data = reader.GetRemainingBytes();
-                        InvokeOnTransportEvent(NetworkEvent.Data, author, data, Time.time);
+                        InvokeOnTransportEvent(NetworkEvent.Data, author, new ArraySegment<byte>(data), Time.time);
                         break;
                     }
                 default:
-                    Debug.LogError("Unknown Promul control byte " + control);
+                    Debug.LogError("Unknown Promul control byte " + message.Type);
                     break;
             }
 
@@ -197,8 +204,9 @@ namespace Promul.Runtime
         }
         void INetEventListener.OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
+            Debug.Log("Disconnected " + disconnectInfo.Reason.ToString() + " " + disconnectInfo.SocketErrorCode.ToString());
             if (disconnectInfo.Reason != DisconnectReason.DisconnectPeerCalled)
-                InvokeOnTransportEvent(NetworkEvent.TransportFailure, 0, ArraySegment<byte>.Empty, Time.time);
+                InvokeOnTransportEvent(NetworkEvent.TransportFailure, 0, new ArraySegment<byte>(), Time.time);
         }
 
         void INetEventListener.OnPeerConnected(NetPeer peer)

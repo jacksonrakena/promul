@@ -41,14 +41,20 @@
         <Reference Include="UnityEngine">
             <HintPath>C:\Program Files\Unity\Hub\Editor\2023.1.19f1\Editor\Data\Managed\UnityEngine.dll</HintPath>
         </Reference>
+        <Reference Include="Unity.Netcode.Runtime">
+            <HintPath>D:\Code\Ace In The Hole\Library\ScriptAssemblies\Unity.Netcode.Runtime.dll</HintPath>
+        </Reference>
     </ItemGroup>
     <ItemGroup>
         <Compile Include="PromulTransport.cs" />
-        <Compile Include="Properties\AssemblyInfo.cs"/>
+        <Compile Include="Properties\AssemblyInfo.cs" />
     </ItemGroup>
     <ItemGroup>
       <Content Include="com.fireworkeyes.netcode.transport.promul.asmdef" />
-        <ProjectReference Include="..\Promul.Common\Promul.Common.csproj" />
+        <ProjectReference Include="..\Common\Promul.Common.csproj">
+          <Project>{009a3a68-30a0-44eb-9b42-8fcb6bd89195}</Project>
+          <Name>Promul.Common</Name>
+        </ProjectReference>
     </ItemGroup>
     <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets"/>
     <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
