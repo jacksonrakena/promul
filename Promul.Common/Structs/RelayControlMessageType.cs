@@ -1,4 +1,4 @@
-namespace Promul.Server.Relay.Structs;
+namespace Promul.Common.Structs;
 
 public enum RelayControlMessageType : byte
 {

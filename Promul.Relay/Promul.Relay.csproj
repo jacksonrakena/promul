@@ -10,7 +10,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="LiteNetLib" Version="1.1.0" />
+        <ProjectReference Include="..\Promul.Common\Promul.Common.csproj" />
     </ItemGroup>
 
 </Project>

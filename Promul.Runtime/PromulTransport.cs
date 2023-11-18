@@ -3,10 +3,8 @@ using System.Net;
 using System.Net.Sockets;
 using LiteNetLib;
 using LiteNetLib.Utils;
-using Unity.Netcode;
 using UnityEngine;
-
-namespace Promul.Transport
+namespace Promul.Runtime
 {
     public class PromulTransport : NetworkTransport, INetEventListener
     {

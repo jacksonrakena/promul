@@ -2,7 +2,7 @@
 using System.Net.Sockets;
 using LiteNetLib;
 using LiteNetLib.Utils;
-using Promul.Server.Relay.Structs;
+using Promul.Common.Structs;
 namespace Promul.Server.Relay;
 
 public class RelayServer : INetEventListener
@@ -23,7 +23,7 @@ public class RelayServer : INetEventListener
     public void Start()
     {
         NetManager.IPv6Enabled = false;
-        NetManager.Start("127.0.0.1", "", 4098);
+        NetManager.Start(IPAddress.Any, IPAddress.Any, 4098);
     }
 
     public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
