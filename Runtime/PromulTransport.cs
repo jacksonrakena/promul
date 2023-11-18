@@ -107,8 +107,7 @@ namespace Promul.Runtime
                 // RELAYED_DATA
                 case RelayControlMessageType.Data:
                     {
-                        var data = reader.GetRemainingBytes();
-                        InvokeOnTransportEvent(NetworkEvent.Data, author, new ArraySegment<byte>(data), Time.time);
+                        InvokeOnTransportEvent(NetworkEvent.Data, author, new ArraySegment<byte>(message.Data), Time.time);
                         break;
                     }
                 default:
