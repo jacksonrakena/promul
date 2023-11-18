@@ -214,10 +214,11 @@ namespace Promul.Runtime
             var writer = new NetDataWriter();
             writer.Put(new RelayControlMessage
             {
-                Type = RelayControlMessageType.Data,
+                Type = RelayControlMessageType.Hello,
                 AuthorClientId = 0,
                 Data = Encoding.Default.GetBytes("TEST")
             });
+            peer.Send(writer, DeliveryMethod.ReliableOrdered);
         }
 
         void INetEventListener.OnNetworkError(IPEndPoint endPoint, SocketError socketError)
