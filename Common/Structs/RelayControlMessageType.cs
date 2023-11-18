@@ -6,6 +6,11 @@ namespace Promul.Common.Structs
    * Bidirectional. Relayed data.
    */
   Data = 0x00,
+  
+  /*
+   * [Client|Server] -> Relay. Identifying.
+   */
+  Hello = 0x01,
     
   /*
    * Relay -> Client Only. You are connected to the server.

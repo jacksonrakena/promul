@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using Promul.Common.Structs;
@@ -210,6 +211,13 @@ namespace Promul.Runtime
 
         void INetEventListener.OnPeerConnected(NetPeer peer)
         {
+            var writer = new NetDataWriter();
+            writer.Put(new RelayControlMessage
+            {
+                Type = RelayControlMessageType.Data,
+                AuthorClientId = 0,
+                Data = Encoding.Default.GetBytes("TEST")
+            });
         }
 
         void INetEventListener.OnNetworkError(IPEndPoint endPoint, SocketError socketError)

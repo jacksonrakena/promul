@@ -1,14 +1,22 @@
 ﻿using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using Promul.Common.Structs;
+using Promul.Server.Relay.Sessions;
 namespace Promul.Server.Relay;
 
 public class RelayServer : INetEventListener
 {
     public NetManager NetManager { get; }
-    readonly Dictionary<int, NetPeer> connections = new Dictionary<int, NetPeer>();
+
+    readonly Dictionary<string, RelaySession> sessions = new Dictionary<string, RelaySession>()
+    {
+        { "TEST", new RelaySession("TEST") }
+    };
+    
+    readonly Dictionary<NetPeer, RelaySession> sessionsByPeer = new Dictionary<NetPeer, RelaySession>();
     
     public RelayServer()
     {
@@ -29,24 +37,30 @@ public class RelayServer : INetEventListener
     public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
         var packet = reader.Get();
-        if (packet.Type == RelayControlMessageType.Data)
+
+        if (!sessionsByPeer.TryGetValue(peer, out var session))
         {
-            if (!connections.TryGetValue((int) packet.AuthorClientId, out var dest))
+            if (packet.Type != RelayControlMessageType.Hello)
             {
-                Console.WriteLine($"{peer.Id} tried to send information to {packet.AuthorClientId}, but {packet.AuthorClientId} is not connected to the relay.");
+                Console.WriteLine($"Disconnecting {peer.Id} because they are not attached to a session and they did not send HELLO.");
+                peer.Disconnect();
                 return;
             }
-            
-            var writer = new NetDataWriter();
-            var msg = new RelayControlMessage
+
+            var key = Encoding.Default.GetString(packet.Data);
+            if (!sessions.TryGetValue(key, out var keyedSession))
             {
-                Type = RelayControlMessageType.Data,
-                AuthorClientId = (ulong)peer.Id,
-                Data = packet.Data
-            };
-            writer.Put(msg);
-            dest.Send(writer, deliveryMethod);
+                Console.WriteLine($"Disconnecting {peer.Id} because they requested to join a session that does not exist.");
+                peer.Disconnect();
+                return;
+            }
+            keyedSession.OnJoin(peer);
+            sessionsByPeer[peer] = keyedSession;
+            
+            return;
         }
+
+        session.OnReceive(peer, packet, deliveryMethod);
     }
     
     public void OnConnectionRequest(ConnectionRequest request)
@@ -56,61 +70,15 @@ public class RelayServer : INetEventListener
     
     public void OnPeerConnected(NetPeer peer)
     {
-        if (connections.Count == 0)
-        {
-            Console.WriteLine($"Connected to {peer.EndPoint}, assigned host");
-        }
-        else
-        {
-            var hostWriter = new NetDataWriter();
-            hostWriter.Put(new RelayControlMessage
-            {
-                Type = RelayControlMessageType.ClientConnected,
-                AuthorClientId = (ulong) peer.Id,
-                Data = Array.Empty<byte>()
-            });
-            var host = connections[0];
-            host.Send(hostWriter, DeliveryMethod.ReliableOrdered);
-            Console.WriteLine($"Told host {host.Id} that {peer.Id} wishes to join relay.");
-                
-            var responseMessage = new NetDataWriter();
-            responseMessage.Put(new RelayControlMessage
-            {
-                Type = RelayControlMessageType.Connected,
-                AuthorClientId = (ulong)host.Id,
-                Data = Array.Empty<byte>()
-            });
-            peer.Send(responseMessage, DeliveryMethod.ReliableOrdered);
-            Console.WriteLine($"Told client {peer.Id} that they are ready to join.");
-        }
-        connections[peer.Id] = peer;
+        Console.WriteLine($"Connected to {peer.EndPoint}, assigned host");
     }
     public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
     {
         Console.WriteLine($"Peer {peer.Id} disconnected: {disconnectInfo.Reason} {disconnectInfo.SocketErrorCode}");
-        if (peer.Id == 0)
+        if (sessionsByPeer.TryGetValue(peer, out var session))
         {
-            Console.WriteLine("Host disconnecting. Resetting state");
-            foreach (var con in connections.Values)
-            {
-                con.Disconnect();
-            }
-            connections.Clear();
-        }
-        else
-        {
-            if (connections.TryGetValue(0, out var host))
-            {
-                var message = new NetDataWriter();
-                message.Put(new RelayControlMessage
-                {
-                    Type = RelayControlMessageType.ClientDisconnected,
-                    AuthorClientId = (ulong) peer.Id,
-                    Data = Array.Empty<byte>()
-                });
-                host.Send(message, DeliveryMethod.ReliableOrdered);
-            }
-            connections.Remove(peer.Id);
+            session.OnLeave(peer);
+            sessionsByPeer.Remove(peer);
         }
     }
     
