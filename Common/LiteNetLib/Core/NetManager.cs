@@ -973,7 +973,7 @@ namespace LiteNetLib
                 return null;
 
             byte connectionNumber = 0;
-            //_peersLock.EnterUpgradeableReadLock();
+            _peersLock.EnterUpgradeableReadLock();
             if (_peersDict.TryGetValue(target, out var peer))
             {
                 switch (peer.ConnectionState)
@@ -981,7 +981,7 @@ namespace LiteNetLib
                     //just return already connected peer
                     case ConnectionState.Connected:
                     case ConnectionState.Outgoing:
-                        //_peersLock.ExitUpgradeableReadLock();
+                        _peersLock.ExitUpgradeableReadLock();
                         return peer;
                 }
                 //else reconnect
@@ -993,7 +993,7 @@ namespace LiteNetLib
             //And send connection request
             peer = await NetPeer.ConnectToAsync(this, target, GetNextPeerId(), connectionNumber, connectionData);
             AddPeer(peer);
-            //_peersLock.ExitUpgradeableReadLock();
+            _peersLock.ExitUpgradeableReadLock();
 
             return peer;
         }

@@ -181,7 +181,8 @@ namespace Promul.Runtime
                 SimulationPacketLossChance = SimulatePacketLossChance,
                 SimulateLatency = SimulateMaxLatency > 0,
                 SimulationMinLatency = SimulateMinLatency,
-                SimulationMaxLatency = SimulateMaxLatency
+                SimulationMaxLatency = SimulateMaxLatency,
+                IPv6Enabled = false
             };
 
             m_NetManager.OnConnectionRequest += OnConnectionRequest;
