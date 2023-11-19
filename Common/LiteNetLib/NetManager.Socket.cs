@@ -158,7 +158,7 @@ namespace LiteNetLib
 
 #if UNITY_2018_3_OR_NEWER
             if (_pausedSocketFix == null)
-                _pausedSocketFix = new PausedSocketFix(this, addressIPv4, addressIPv6, port, manualMode);
+                _pausedSocketFix = new PausedSocketFix(this, addressIPv4, addressIPv6, port, false);
 #endif
             
             //Check IPv6 support
