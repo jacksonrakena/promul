@@ -144,6 +144,8 @@ namespace LiteNetLib
                     NetDebug.WriteError("[NM] SocketReceiveThread error: " + e );
                 }
             }
+            _udpSocketv4?.Dispose();
+            _udpSocketv6?.Dispose();
         }
 
         /// <summary>
