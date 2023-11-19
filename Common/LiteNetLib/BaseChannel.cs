@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace LiteNetLib
 {
@@ -33,16 +34,16 @@ namespace LiteNetLib
             }
         }
 
-        public bool SendAndCheckQueue()
+        public async Task<bool> SendAndCheckQueue()
         {
-            bool hasPacketsToSend = SendNextPackets();
+            bool hasPacketsToSend = await SendNextPackets();
             if (!hasPacketsToSend)
                 Interlocked.Exchange(ref _isAddedToPeerChannelSendQueue, 0);
 
             return hasPacketsToSend;
         }
 
-        protected abstract bool SendNextPackets();
-        public abstract bool ProcessPacket(NetPacket packet);
+        protected abstract Task<bool> SendNextPackets();
+        public abstract Task<bool> ProcessPacket(NetPacket packet);
     }
 }

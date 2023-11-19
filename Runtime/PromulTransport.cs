@@ -62,7 +62,6 @@ namespace Promul.Runtime
 
         ConcurrentQueue<(NetworkEvent, ulong, ArraySegment<byte>, float)> _queue = new ConcurrentQueue<(NetworkEvent, ulong, ArraySegment<byte>, float)>();
         
-
         public override bool IsSupported => Application.platform != RuntimePlatform.WebGLPlayer;
 
         NetPeer? _relayPeer;
@@ -77,14 +76,11 @@ namespace Promul.Runtime
         
         public override void Send(ulong clientId, ArraySegment<byte> data, NetworkDelivery qos)
         {
-            var cpy = new byte[data.Count];
-            
-            Array.Copy(data.Array, data.Offset, cpy, 0, data.Count);
             SendControl(new RelayControlMessage
             {
                 Type = RelayControlMessageType.Data,
                 AuthorClientId = clientId,
-                Data = cpy
+                Data = data
             }, qos);
         }
 
@@ -99,20 +95,19 @@ namespace Promul.Runtime
                 // or we're a client and we're connected.
                 case RelayControlMessageType.Connected:
                     {
-                        _queue.Enqueue((NetworkEvent.Connect, author, default, Time.time));
+                        _queue.Enqueue((NetworkEvent.Connect, author, default, 0));
                         break;
                     }
                 // A client has disconnected from the relay.
                 case RelayControlMessageType.Disconnected:
                     {
-                        _queue.Enqueue((NetworkEvent.Disconnect, author, default, Time.time));
-                        InvokeOnTransportEvent(NetworkEvent.Disconnect, author, default, Time.time);
+                        _queue.Enqueue((NetworkEvent.Disconnect, author, default, 0));
                         break;
                     }
                 // Relayed data
                 case RelayControlMessageType.Data:
                 {
-                    _queue.Enqueue((NetworkEvent.Data, author, message.Data, Time.time));
+                    _queue.Enqueue((NetworkEvent.Data, author, message.Data, 0));
                         break;
                 }
                 case RelayControlMessageType.KickFromRelay:
@@ -132,7 +127,7 @@ namespace Promul.Runtime
             if (_queue.TryDequeue(out var i))
             {
                 clientId = i.Item2;
-                receiveTime = i.Item4;
+                receiveTime = Time.realtimeSinceStartup;
                 payload = i.Item3;
                 return i.Item1;
             }
@@ -143,7 +138,7 @@ namespace Promul.Runtime
         {
             _ = Task.Run(async () =>
             {
-                _ = m_NetManager.Bind(IPAddress.Any, IPAddress.None, 0);
+                m_NetManager.Bind(IPAddress.Any, IPAddress.None, 0);
                 var joinPacket = new NetDataWriter();
                 joinPacket.Put(joinCode);
                 _relayPeer = await m_NetManager.ConnectAsync(NetUtils.MakeEndPoint(Address, Port), joinPacket);
@@ -183,14 +178,13 @@ namespace Promul.Runtime
 
         public override void Shutdown()
         {
+            Debug.Log("Shutdown");
             m_NetManager.OnConnectionRequest -= OnConnectionRequest;
             m_NetManager.OnPeerDisconnected -= OnPeerDisconnected;
             m_NetManager.OnReceive -= OnNetworkReceive;
-            m_NetManager.CloseSocket();
-            m_NetManager.StopAsync().Wait();
+            _ = m_NetManager.StopAsync();
             
             _cts.Cancel();
-            _ = Task.Run(() => m_NetManager.StopAsync());
             _relayPeer = null;
             m_HostType = HostType.None;
         }
@@ -235,8 +229,8 @@ namespace Promul.Runtime
         async Task OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
             Debug.Log("Disconnected " + disconnectInfo.Reason.ToString() + " " + disconnectInfo.SocketErrorCode.ToString());
-            if (disconnectInfo.Reason != DisconnectReason.DisconnectPeerCalled)
-                InvokeOnTransportEvent(NetworkEvent.TransportFailure, 0, new ArraySegment<byte>(), Time.time);
+            if (disconnectInfo.Reason != DisconnectReason.DisconnectPeerCalled) 
+                _queue.Enqueue((NetworkEvent.TransportFailure, 0, new ArraySegment<byte>(), 0));
         }
 
         static int SecondsToMilliseconds(float seconds)

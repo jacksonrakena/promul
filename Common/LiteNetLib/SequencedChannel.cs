@@ -1,4 +1,6 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace LiteNetLib
 {
@@ -21,7 +23,8 @@ namespace LiteNetLib
                 _ackPacket = new NetPacket(PacketProperty.Ack, 0) {ChannelId = id};
         }
 
-        protected override bool SendNextPackets()
+        SemaphoreSlim outgoingQueueSem = new SemaphoreSlim(1, 1);
+        protected override async Task<bool> SendNextPackets()
         {
             if (_reliable && OutgoingQueue.Count == 0)
             {
@@ -33,46 +36,47 @@ namespace LiteNetLib
                     if (packet != null)
                     {
                         _lastPacketSendTime = currentTime;
-                        Peer.SendUserData(packet);
+                        await Peer.SendUserData(packet);
                     }
                 }
             }
             else
             {
-                lock (OutgoingQueue)
-                {
-                    while (OutgoingQueue.Count > 0)
-                    {
-                        NetPacket packet = OutgoingQueue.Dequeue();
-                        _localSequence = (_localSequence + 1) % NetConstants.MaxSequence;
-                        packet.Sequence = (ushort)_localSequence;
-                        packet.ChannelId = _id;
-                        Peer.SendUserData(packet);
+                await outgoingQueueSem.WaitAsync();
 
-                        if (_reliable && OutgoingQueue.Count == 0)
-                        {
-                            _lastPacketSendTime = DateTime.UtcNow.Ticks;
-                            _lastPacket = packet;
-                        }
-                        else
-                        {
-                            Peer.NetManager.PoolRecycle(packet);
-                        }
+                while (OutgoingQueue.Count > 0)
+                {
+                    NetPacket packet = OutgoingQueue.Dequeue();
+                    _localSequence = (_localSequence + 1) % NetConstants.MaxSequence;
+                    packet.Sequence = (ushort)_localSequence;
+                    packet.ChannelId = _id;
+                    await Peer.SendUserData(packet);
+
+                    if (_reliable && OutgoingQueue.Count == 0)
+                    {
+                        _lastPacketSendTime = DateTime.UtcNow.Ticks;
+                        _lastPacket = packet;
+                    }
+                    else
+                    {
+                        Peer.NetManager.PoolRecycle(packet);
                     }
                 }
+                
+                outgoingQueueSem.Release();
             }
 
             if (_reliable && _mustSendAck)
             {
                 _mustSendAck = false;
                 _ackPacket.Sequence = _remoteSequence;
-                Peer.SendUserData(_ackPacket);
+                await Peer.SendUserData(_ackPacket);
             }
 
             return _lastPacket != null;
         }
 
-        public override bool ProcessPacket(NetPacket packet)
+        public override async Task<bool> ProcessPacket(NetPacket packet)
         {
             if (packet.IsFragmented)
                 return false;
@@ -93,7 +97,7 @@ namespace LiteNetLib
                 }
 
                 _remoteSequence = packet.Sequence;
-                Peer.NetManager.CreateReceiveEvent(
+                await Peer.NetManager.CreateReceiveEvent(
                     packet,
                     _reliable ? DeliveryMethod.ReliableSequenced : DeliveryMethod.Sequenced,
                     (byte)(packet.ChannelId / NetConstants.ChannelTypeCount),

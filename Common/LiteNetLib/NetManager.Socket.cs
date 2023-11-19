@@ -74,7 +74,7 @@ namespace LiteNetLib
                     break;
                 default:
                     NetDebug.WriteError($"[R]Error code: {(int)ex.SocketErrorCode} - {ex}");
-                    await CreateEvent(NetEvent.NetEventType.Error, errorCode: ex.SocketErrorCode);
+                    if (OnNetworkError != null) await OnNetworkError(null, ex.SocketErrorCode);
                     break;
             }
             return false;
@@ -98,14 +98,7 @@ namespace LiteNetLib
             EndPoint bufferEndPoint4 = new IPEndPoint(IPAddress.Any, 0);
             EndPoint bufferEndPoint6 = new IPEndPoint(IPAddress.IPv6Any, 0);
 
-            _ = Task.Run(async () =>
-            {
-                while (!cancellationToken.IsCancellationRequested)
-                {
-                    await DisconnectIdlers();
-                    await Task.Delay(DisconnectTimeout, cancellationToken);
-                }
-            }, cancellationToken);
+            _ = Task.Run(() => PeerUpdateLoopBlockingAsync(cancellationToken));
             
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -351,11 +344,11 @@ namespace LiteNetLib
                                 null);
                         }
 
-                        await CreateEvent(NetEvent.NetEventType.Error, remoteEndPoint: remoteEndPoint, errorCode: ex.SocketErrorCode);
+                        if (OnNetworkError != null) await OnNetworkError(remoteEndPoint, ex.SocketErrorCode);
                         return -1;
 
                     case SocketError.Shutdown:
-                        await CreateEvent(NetEvent.NetEventType.Error, remoteEndPoint: remoteEndPoint, errorCode: ex.SocketErrorCode);
+                        if (OnNetworkError != null) await OnNetworkError(remoteEndPoint, ex.SocketErrorCode);
                         return -1;
 
                     default:

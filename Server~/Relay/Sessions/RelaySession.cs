@@ -33,6 +33,7 @@ public class RelaySession
         switch (message.Type)
         {
             case RelayControlMessageType.Data:
+                Console.WriteLine($"{from.Id} requesting to send {message.Data.Count} bytes of data to {message.AuthorClientId}");
                 Send(dest, new RelayControlMessage { Type = RelayControlMessageType.Data, AuthorClientId = (ulong)from.Id, Data = message.Data }, method);
                 break;
             case RelayControlMessageType.KickFromRelay:
@@ -61,6 +62,7 @@ public class RelaySession
     {
         var writer = new NetDataWriter();
         writer.Put(message);
+        _logger.LogInformation($"Sending {message.Type} from {message.AuthorClientId} to {to.Id}");
         to.Send(writer, deliveryMethod: method);
     }
 

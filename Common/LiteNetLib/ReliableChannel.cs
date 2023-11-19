@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace LiteNetLib
 {
@@ -22,7 +24,7 @@ namespace LiteNetLib
             }
 
             //Returns true if there is a pending packet inside
-            public bool TrySend(long currentTime, NetPeer peer)
+            public async Task<bool> TrySendAsync(long currentTime, NetPeer peer)
             {
                 if (_packet == null)
                     return false;
@@ -37,7 +39,7 @@ namespace LiteNetLib
                 }
                 _timeStamp = currentTime;
                 _isSent = true;
-                peer.SendUserData(_packet);
+                await peer.SendUserData(_packet);
                 return true;
             }
 
@@ -165,21 +167,25 @@ namespace LiteNetLib
             }
         }
 
-        protected override bool SendNextPackets()
+        SemaphoreSlim pendingPacketsSem = new SemaphoreSlim(1, 1);
+        SemaphoreSlim outgoingQueueSem = new SemaphoreSlim(1, 1);
+        SemaphoreSlim outgoingAcksSem = new SemaphoreSlim(1, 1);
+        protected override async Task<bool> SendNextPackets()
         {
             if (_mustSendAcks)
             {
                 _mustSendAcks = false;
                 NetDebug.Write("[RR]SendAcks");
-                lock(_outgoingAcks)
-                    Peer.SendUserData(_outgoingAcks);
+                await outgoingAcksSem.WaitAsync();
+                try { await Peer.SendUserData(_outgoingAcks); }
+                finally { outgoingAcksSem.Release(); }
             }
 
             long currentTime = DateTime.UtcNow.Ticks;
             bool hasPendingPackets = false;
 
-            lock (_pendingPackets)
-            {
+            await pendingPacketsSem.WaitAsync();
+            
                 //get packets from queue
                 lock (OutgoingQueue)
                 {
@@ -201,16 +207,17 @@ namespace LiteNetLib
                 for (int pendingSeq = _localWindowStart; pendingSeq != _localSeqence; pendingSeq = (pendingSeq + 1) % NetConstants.MaxSequence)
                 {
                     // Please note: TrySend is invoked on a mutable struct, it's important to not extract it into a variable here
-                    if (_pendingPackets[pendingSeq % _windowSize].TrySend(currentTime, Peer))
+                    if (await _pendingPackets[pendingSeq % _windowSize].TrySendAsync(currentTime, Peer))
                         hasPendingPackets = true;
                 }
-            }
+            
+            pendingPacketsSem.Release();
 
             return hasPendingPackets || _mustSendAcks || OutgoingQueue.Count > 0;
         }
 
         //Process incoming packet
-        public override bool ProcessPacket(NetPacket packet)
+        public override async Task<bool> ProcessPacket(NetPacket packet)
         {
             if (packet.Property == PacketProperty.Ack)
             {
@@ -295,7 +302,7 @@ namespace LiteNetLib
             if (seq == _remoteSequence)
             {
                 NetDebug.Write("[RR]ReliableInOrder packet succes");
-                Peer.AddReliablePacket(_deliveryMethod, packet);
+                await Peer.AddReliablePacket(_deliveryMethod, packet);
                 _remoteSequence = (_remoteSequence + 1) % NetConstants.MaxSequence;
 
                 if (_ordered)
@@ -305,7 +312,7 @@ namespace LiteNetLib
                     {
                         //process holden packet
                         _receivedPackets[_remoteSequence % _windowSize] = null;
-                        Peer.AddReliablePacket(_deliveryMethod, p);
+                        await Peer.AddReliablePacket(_deliveryMethod, p);
                         _remoteSequence = (_remoteSequence + 1) % NetConstants.MaxSequence;
                     }
                 }
@@ -329,7 +336,7 @@ namespace LiteNetLib
             else
             {
                 _earlyReceived[ackIdx] = true;
-                Peer.AddReliablePacket(_deliveryMethod, packet);
+                await Peer.AddReliablePacket(_deliveryMethod, packet);
             }
             return true;
         }

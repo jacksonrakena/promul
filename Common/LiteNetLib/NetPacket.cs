@@ -32,6 +32,7 @@ namespace LiteNetLib
 
         public static implicit operator ArraySegment<byte>(NetPacket ndw)
         {
+            if (ndw?.RawData == null) return ArraySegment<byte>.Empty;
             return new ArraySegment<byte>(ndw.RawData, 0, ndw.Size);
         }
 

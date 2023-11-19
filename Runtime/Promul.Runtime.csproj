@@ -7,6 +7,9 @@
         <FileAlignment>512</FileAlignment>
         <LangVersion>8</LangVersion>
         <Nullable>enable</Nullable>
+        <BaseOutputPath>bin~</BaseOutputPath>
+        <BaseIntermediateOutputPath>obj~</BaseIntermediateOutputPath>
+        <DefineConstants>DEBUG</DefineConstants>
     </PropertyGroup>
     <ItemGroup>
         <Reference Include="UnityEngine.CoreModule">

@@ -1,59 +1,59 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 namespace LiteNetLib
 {
     public partial class NetManager
     {
-        private async Task DisconnectIdlers()
+        private async Task PeerUpdateLoopBlockingAsync(CancellationToken ct = default)
         {
             var peersToRemove = new List<NetPeer>();
-            var stopwatch = new Stopwatch();
-            stopwatch.Start();
-            
-            try
+            var startTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+            while (!ct.IsCancellationRequested)
             {
-                ProcessDelayedPackets();
-                int elapsed = (int)stopwatch.ElapsedMilliseconds;
-                elapsed = elapsed <= 0 ? 1 : elapsed;
-                stopwatch.Restart();
-    
-                for (var netPeer = _headPeer; netPeer != null; netPeer = netPeer.NextPeer)
+                try
                 {
-                    if (netPeer.ConnectionState == ConnectionState.Disconnected &&
-                        netPeer.TimeSinceLastPacket > DisconnectTimeout)
+                    ProcessDelayedPackets();
+                    var deltaTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - startTime;
+                    startTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+                    async Task tick(NetPeer e)
                     {
-                        peersToRemove.Add(netPeer);
+                        if (e.ConnectionState == ConnectionState.Disconnected &&
+                            e.TimeSinceLastPacket > DisconnectTimeout)
+                        {
+                            peersToRemove.Add(e);
+                        }
+                        else
+                        {
+                            await e.Update(deltaTime);
+                        }
                     }
-                    else
-                    {
-                        await netPeer.Update(elapsed);
-                    }
-                }
+
+                    await Task.WhenAll(_peersArray.Where(e => e != null).Select(tick));
     
-                if (peersToRemove.Count > 0)
+                    if (peersToRemove.Count > 0)
+                    {
+                        for (int i = 0; i < peersToRemove.Count; i++)
+                            RemovePeerInternal(peersToRemove[i]);
+                        peersToRemove.Clear();
+                    }
+    
+                    ProcessNtpRequests(deltaTime);
+                }
+                catch (ThreadAbortException)
                 {
-                    _peersLock.EnterWriteLock();
-                    for (int i = 0; i < peersToRemove.Count; i++)
-                        RemovePeerInternal(peersToRemove[i]);
-                    _peersLock.ExitWriteLock();
-                    peersToRemove.Clear();
+                    return;
                 }
-    
-                ProcessNtpRequests(elapsed);
+                catch (Exception e)
+                {
+                    NetDebug.WriteError("[NM] LogicThread error: " + e);
+                }   
             }
-            catch (ThreadAbortException)
-            {
-                return;
-            }
-            catch (Exception e)
-            {
-                NetDebug.WriteError("[NM] LogicThread error: " + e);
-            }
-            
-            stopwatch.Stop();
         }
     }
 }

@@ -5,6 +5,7 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+        <DefineConstants>DEBUG;DEBUG_MESSAGES</DefineConstants>
     </PropertyGroup>
 
     <ItemGroup>
