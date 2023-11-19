@@ -1,7 +1,10 @@
-﻿using System.Collections.Concurrent;
+﻿using System;
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading.Tasks;
+using LiteNetLib.Data;
 using LiteNetLib.Utils;
 
 namespace LiteNetLib
@@ -80,7 +83,7 @@ namespace LiteNetLib
         private readonly NetManager _socket;
         private readonly ConcurrentQueue<RequestEventData> _requestEvents = new ConcurrentQueue<RequestEventData>();
         private readonly ConcurrentQueue<SuccessEventData> _successEvents = new ConcurrentQueue<SuccessEventData>();
-        private readonly NetDataReader _cacheReader = new NetDataReader();
+        NetDataReader? _cacheReader;
         private readonly NetDataWriter _cacheWriter = new NetDataWriter();
         private readonly NetPacketProcessor _netPacketProcessor = new NetPacketProcessor(MaxTokenLength);
         private INatPunchListener _natPunchListener;
@@ -103,7 +106,7 @@ namespace LiteNetLib
         {
             lock (_cacheReader)
             {
-                _cacheReader.SetSource(packet.RawData, NetConstants.HeaderSize, packet.Size);
+                _cacheReader = new NetDataReader(new ArraySegment<byte>(packet.RawData, NetConstants.HeaderSize, packet.Size));
                 _netPacketProcessor.ReadAllPackets(_cacheReader, senderEndPoint);
             }
         }
@@ -113,7 +116,7 @@ namespace LiteNetLib
             _natPunchListener = listener;
         }
 
-        private void Send<
+        private async Task Send<
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(Trimming.SerializerMemberTypes)]
 #endif
@@ -122,7 +125,7 @@ namespace LiteNetLib
             _cacheWriter.Reset();
             _cacheWriter.Put((byte)PacketProperty.NatMessage);
             _netPacketProcessor.Write(_cacheWriter, packet);
-            _socket.SendRaw(_cacheWriter.Data, 0, _cacheWriter.Length, target);
+            await _socket.SendRaw(_cacheWriter, target);
         }
 
         public void NatIntroduce(
@@ -221,17 +224,17 @@ namespace LiteNetLib
 
             // send internal punch
             var punchPacket = new NatPunchPacket {Token = req.Token};
-            Send(punchPacket, req.Internal);
+            Send(punchPacket, req.Internal).GetAwaiter().GetResult();
             NetDebug.Write(NetLogLevel.Trace, $"[NAT] internal punch sent to {req.Internal}");
 
             // hack for some routers
             _socket.Ttl = 2;
-            _socket.SendRaw(new[] { (byte)PacketProperty.Empty }, 0, 1, req.External);
+            _socket.SendRaw(new[] { (byte)PacketProperty.Empty }, req.External).GetAwaiter().GetResult();
 
             // send external punch
             _socket.Ttl = NetConstants.SocketTTL;
             punchPacket.IsExternal = true;
-            Send(punchPacket, req.External);
+            Send(punchPacket, req.External).GetAwaiter().GetResult();
             NetDebug.Write(NetLogLevel.Trace, $"[NAT] external punch sent to {req.External}");
         }
 

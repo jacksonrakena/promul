@@ -1,6 +1,8 @@
-﻿using System.Net;
+﻿using System;
+using System.Net;
 using System.Threading;
-using LiteNetLib.Utils;
+using System.Threading.Tasks;
+using LiteNetLib.Data;
 
 namespace LiteNetLib
 {
@@ -49,10 +51,14 @@ namespace LiteNetLib
             _listener = listener;
         }
 
-        public NetPeer AcceptIfKey(string key)
+        /// <summary>
+        /// Accepts the connection if the contained data is a <see cref="string"/> and matches <see cref="key"/> exactly.
+        /// </summary>
+        /// <param name="key">The key to compare the data to.</param>
+        /// <returns>Null, if the request was rejected. Otherwise, the connected peer.</returns>
+        public async Task<NetPeer?> AcceptIfMatchesKeyAsync(string key)
         {
-            if (!TryActivate())
-                return null;
+            if (!TryActivate()) return null;
             try
             {
                 if (Data.GetString() == key)
@@ -63,72 +69,31 @@ namespace LiteNetLib
                 NetDebug.WriteError("[AC] Invalid incoming data");
             }
             if (Result == ConnectionRequestResult.Accept)
-                return _listener.OnConnectionSolved(this, null, 0, 0);
+                return await _listener.OnConnectionRequestResolved(this, null);
 
             Result = ConnectionRequestResult.Reject;
-            _listener.OnConnectionSolved(this, null, 0, 0);
+            await _listener.OnConnectionRequestResolved(this, null);
             return null;
         }
 
         /// <summary>
-        /// Accept connection and get new NetPeer as result
+        /// Accepts the connection.
         /// </summary>
-        /// <returns>Connected NetPeer</returns>
-        public NetPeer Accept()
+        /// <returns>The connected peer, or null, if the manager was unable to activate the peer.</returns>
+        public async Task<NetPeer?> AcceptAsync()
         {
             if (!TryActivate())
                 return null;
             Result = ConnectionRequestResult.Accept;
-            return _listener.OnConnectionSolved(this, null, 0, 0);
+            return await _listener.OnConnectionRequestResolved(this, null);
         }
 
-        public void Reject(byte[] rejectData, int start, int length, bool force)
+        public async Task RejectAsync(ArraySegment<byte> data = default, bool force = false)
         {
             if (!TryActivate())
                 return;
             Result = force ? ConnectionRequestResult.RejectForce : ConnectionRequestResult.Reject;
-            _listener.OnConnectionSolved(this, rejectData, start, length);
-        }
-
-        public void Reject(byte[] rejectData, int start, int length)
-        {
-            Reject(rejectData, start, length, false);
-        }
-
-
-        public void RejectForce(byte[] rejectData, int start, int length)
-        {
-            Reject(rejectData, start, length, true);
-        }
-
-        public void RejectForce()
-        {
-            Reject(null, 0, 0, true);
-        }
-
-        public void RejectForce(byte[] rejectData)
-        {
-            Reject(rejectData, 0, rejectData.Length, true);
-        }
-
-        public void RejectForce(NetDataWriter rejectData)
-        {
-            Reject(rejectData.Data, 0, rejectData.Length, true);
-        }
-
-        public void Reject()
-        {
-            Reject(null, 0, 0, false);
-        }
-
-        public void Reject(byte[] rejectData)
-        {
-            Reject(rejectData, 0, rejectData.Length, false);
-        }
-
-        public void Reject(NetDataWriter rejectData)
-        {
-            Reject(rejectData.Data, 0, rejectData.Length, false);
+            await _listener.OnConnectionRequestResolved(this, data);
         }
     }
 }

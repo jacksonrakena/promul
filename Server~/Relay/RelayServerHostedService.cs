@@ -14,13 +14,11 @@ public class RelayServerHostedService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _relayServer.NetManager.IPv6Enabled = false;
-        _relayServer.NetManager.Start(IPAddress.Any, IPAddress.Any, 4098);
-        _logger.LogInformation($"Listening on port {_relayServer.NetManager.LocalPort}");
-        
-        while (!stoppingToken.IsCancellationRequested)
+        if (_relayServer.NetManager.Bind(IPAddress.Any, IPAddress.Any, 4098))
         {
-            await _relayServer.NetManager.PollEvents();
-            await Task.Delay(15, stoppingToken);
+            _logger.LogInformation($"Listening on port 4098");
+            await _relayServer.NetManager.ListenAsync(stoppingToken);
         }
+        else _logger.LogError("Failed to start relay server.");
     }
 }

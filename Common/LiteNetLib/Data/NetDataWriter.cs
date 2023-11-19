@@ -12,7 +12,6 @@ namespace LiteNetLib.Utils
         protected int _position;
         private const int InitialSize = 64;
         private readonly bool _autoResize;
-
         public int Capacity
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -381,6 +380,11 @@ namespace LiteNetLib.Utils
         public void Put<T>(T obj) where T : INetSerializable
         {
             obj.Serialize(this);
+        }
+
+        public static implicit operator ArraySegment<byte>(NetDataWriter ndw)
+        {
+            return new ArraySegment<byte>(ndw._data, 0, ndw._data.Length);
         }
     }
 }

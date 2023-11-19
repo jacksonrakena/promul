@@ -22,7 +22,7 @@ public class RelaySession
 
     public IEnumerable<NetPeer> Peers => _connections.Values;
 
-    public void OnReceive(NetPeer from, RelayControlMessage message, DeliveryMethod method)
+    public async Task OnReceive(NetPeer from, RelayControlMessage message, DeliveryMethod method)
     {
         if (!_connections.TryGetValue((int) message.AuthorClientId, out var dest))
         {
@@ -42,7 +42,7 @@ public class RelaySession
                     if (_connections.TryGetValue((int)target, out var targetPeer))
                     {
                         _connections.Remove((int)target);
-                        targetPeer.Disconnect();
+                        await _server.NetManager.DisconnectPeerAsync(targetPeer);
                         LogInformation($"Host {from.Id} successfully kicked {target}");
                     }
                 }
@@ -61,7 +61,7 @@ public class RelaySession
     {
         var writer = new NetDataWriter();
         writer.Put(message);
-        to.Send(writer, method);
+        to.Send(writer, deliveryMethod: method);
     }
 
     public void OnJoin(NetPeer peer)
@@ -92,7 +92,7 @@ public class RelaySession
         }
     }
 
-    public void OnLeave(NetPeer peer)
+    public async Task OnLeave(NetPeer peer)
     {
         LogInformation($"{peer.Id} has left");
         if (_connections.ContainsKey(peer.Id))
@@ -102,7 +102,7 @@ public class RelaySession
             {
                 LogInformation("Host has left, resetting");
                 host = null;
-                _server.DestroySession(this);
+                await _server.DestroySession(this);
                 return;
             }
             if (host != null)
@@ -117,11 +117,11 @@ public class RelaySession
         }
     }
 
-    public void DisconnectAll()
+    public async Task DisconnectAll()
     {
         foreach (var con in _connections.Values)
         {
-            con.Disconnect();
+            await this._server.NetManager.DisconnectPeerAsync(con);
         }
         _connections.Clear();
     }

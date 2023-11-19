@@ -15,12 +15,13 @@ namespace LiteNetLib
 
         public int PoolCount => _poolCount;
         
-        private NetPacket PoolGetWithData(PacketProperty property, byte[] data, int start, int length)
+        private NetPacket PoolGetWithData(PacketProperty property, ArraySegment<byte> data)
         {
             int headerSize = NetPacket.GetHeaderSize(property);
-            NetPacket packet = PoolGetPacket(length + headerSize);
+            NetPacket packet = PoolGetPacket(data.Count + headerSize);
             packet.Property = property;
-            Buffer.BlockCopy(data, start, packet.RawData, headerSize, length);
+            data.CopyTo(packet.RawData, headerSize);
+            //Buffer.BlockCopy(data, start, packet.RawData, headerSize, length);
             return packet;
         }
 

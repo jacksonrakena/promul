@@ -3,7 +3,7 @@ using LiteNetLib.Utils;
 
 namespace LiteNetLib
 {
-    internal enum PacketProperty : byte
+    public enum PacketProperty : byte
     {
         Unreliable,
         Channeled,
@@ -25,10 +25,15 @@ namespace LiteNetLib
         Empty
     }
 
-    internal sealed class NetPacket
+    public sealed class NetPacket
     {
         private static readonly int PropertiesCount = Enum.GetValues(typeof(PacketProperty)).Length;
         private static readonly int[] HeaderSizes;
+
+        public static implicit operator ArraySegment<byte>(NetPacket ndw)
+        {
+            return new ArraySegment<byte>(ndw.RawData, 0, ndw.Size);
+        }
 
         static NetPacket()
         {
@@ -118,7 +123,7 @@ namespace LiteNetLib
         public int Size;
 
         //Delivery
-        public object UserData;
+        public object? UserData;
 
         //Pool node
         public NetPacket Next;

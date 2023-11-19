@@ -1,4 +1,6 @@
-﻿namespace LiteNetLib.Utils
+﻿using LiteNetLib.Data;
+
+namespace LiteNetLib.Utils
 {
     public interface INetSerializable
     {

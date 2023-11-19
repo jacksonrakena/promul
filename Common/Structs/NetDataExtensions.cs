@@ -1,3 +1,4 @@
+using LiteNetLib.Data;
 using LiteNetLib.Utils;
 namespace Promul.Common.Structs
 {

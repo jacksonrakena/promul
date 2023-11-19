@@ -10,7 +10,7 @@ using Unity.Netcode;
 using UnityEngine;
 namespace Promul.Runtime
 {
-    public class PromulTransport : NetworkTransport, INetEventListener
+    public class PromulTransport : NetworkTransport
     {
         enum HostType
         {
@@ -58,11 +58,6 @@ namespace Promul.Runtime
             SimulateMaxLatency = Math.Max(SimulateMinLatency, SimulateMaxLatency);
         }
 
-        async void Update()
-        {
-            if (m_NetManager != null) await m_NetManager?.PollEvents();
-        }
-
         public override bool IsSupported => Application.platform != RuntimePlatform.WebGLPlayer;
 
         NetPeer? _relayPeer;
@@ -87,7 +82,7 @@ namespace Promul.Runtime
             }, qos);
         }
 
-        async Task INetEventListener.OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod)
+        async Task OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod)
         {
             var message = reader.Get();
             var author = message.AuthorClientId;
@@ -131,10 +126,10 @@ namespace Promul.Runtime
 
         async Task<bool> ConnectToRelayServer(string joinCode)
         {
-            if (!m_NetManager.Start()) return false;
+            _ = m_NetManager.Bind(IPAddress.Any, IPAddress.None, 4000);
             var joinPacket = new NetDataWriter();
             joinPacket.Put(joinCode);
-            _relayPeer = await m_NetManager.Connect(Address, Port, joinPacket);
+            _relayPeer = await m_NetManager.ConnectAsync(NetUtils.MakeEndPoint(Address, Port), joinPacket);
             return true;
         }
 
@@ -157,7 +152,7 @@ namespace Promul.Runtime
 
         public override void DisconnectLocalClient()
         {
-            m_NetManager.DisconnectAll();
+            m_NetManager.DisconnectAllPeersAsync();
             _relayPeer = null;
         }
 
@@ -169,14 +164,14 @@ namespace Promul.Runtime
 
         public override void Shutdown()
         {
-            m_NetManager?.Stop();
+            m_NetManager?.StopAsync();
             _relayPeer = null;
             m_HostType = HostType.None;
         }
 
         public override void Initialize(NetworkManager networkManager = null)
         {
-            m_NetManager = new NetManager(this)
+            m_NetManager = new NetManager
             {
                 PingInterval = SecondsToMilliseconds(PingInterval),
                 DisconnectTimeout = SecondsToMilliseconds(DisconnectTimeout),
@@ -188,6 +183,10 @@ namespace Promul.Runtime
                 SimulationMinLatency = SimulateMinLatency,
                 SimulationMaxLatency = SimulateMaxLatency
             };
+
+            m_NetManager.OnConnectionRequest += OnConnectionRequest;
+            m_NetManager.OnPeerDisconnected += OnPeerDisconnected;
+            m_NetManager.OnReceive += OnNetworkReceive;
         }
 
         static DeliveryMethod ConvertNetworkDelivery(NetworkDelivery type)
@@ -202,31 +201,15 @@ namespace Promul.Runtime
                 _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
             };
         }
-        async Task INetEventListener.OnConnectionRequest(ConnectionRequest request)
+        async Task OnConnectionRequest(ConnectionRequest request)
         {
-            request.RejectForce();
+            await request.RejectAsync(force: true);
         }
-        async Task INetEventListener.OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
+        async Task OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
             Debug.Log("Disconnected " + disconnectInfo.Reason.ToString() + " " + disconnectInfo.SocketErrorCode.ToString());
             if (disconnectInfo.Reason != DisconnectReason.DisconnectPeerCalled)
                 InvokeOnTransportEvent(NetworkEvent.TransportFailure, 0, new ArraySegment<byte>(), Time.time);
-        }
-
-        async Task INetEventListener.OnPeerConnected(NetPeer peer)
-        {
-        }
-
-        async Task INetEventListener.OnNetworkError(IPEndPoint endPoint, SocketError socketError)
-        {
-        }
-
-        async Task INetEventListener.OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
-        {
-        }
-
-        async Task INetEventListener.OnNetworkLatencyUpdate(NetPeer peer, int latency)
-        {
         }
 
         static int SecondsToMilliseconds(float seconds)

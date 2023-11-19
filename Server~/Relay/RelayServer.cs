@@ -6,7 +6,7 @@ using Promul.Common.Structs;
 using Promul.Server.Relay.Sessions;
 namespace Promul.Server.Relay;
 
-public class RelayServer : INetEventListener
+public class RelayServer
 {
     public NetManager NetManager { get; }
 
@@ -20,7 +20,13 @@ public class RelayServer : INetEventListener
     {
         _logger = logger;
         _factory = factory;
-        NetManager = new NetManager(this);
+        NetManager = new NetManager();
+
+
+        NetManager.OnReceive += OnNetworkReceive;
+        NetManager.OnConnectionRequest += OnConnectionRequest;
+        NetManager.OnPeerConnected += OnPeerConnected;
+        NetManager.OnPeerDisconnected += OnPeerDisconnected;
     }
 
     public Dictionary<string, RelaySession> GetAllSessions() => _sessionsByCode;
@@ -35,14 +41,14 @@ public class RelayServer : INetEventListener
         return _sessionsByCode.GetValueOrDefault(joinCode);
     }
     
-    public void DestroySession(RelaySession session)
+    public async Task DestroySession(RelaySession session)
     {
         foreach (var peer in session.Peers)
         {
             _sessionsByPeer.Remove(peer.Id);
         }
         
-        session.DisconnectAll();
+        await session.DisconnectAll();
         _sessionsByCode.Remove(session.JoinCode);
     }
 
@@ -54,11 +60,11 @@ public class RelayServer : INetEventListener
         if (!_sessionsByPeer.TryGetValue(peer.Id, out var session))
         {
             _logger.LogInformation(format, peer.Id, peer.EndPoint, "because they are not attached to a session.");
-            peer.Disconnect();
+            await NetManager.DisconnectPeerAsync(peer);
             return;
         }
 
-        session.OnReceive(peer, packet, deliveryMethod);
+        await session.OnReceive(peer, packet, deliveryMethod);
     }
     
     public async Task OnConnectionRequest(ConnectionRequest request)
@@ -69,11 +75,11 @@ public class RelayServer : INetEventListener
         {
             const string format = "Rejecting {} because {}";
             _logger.LogInformation(format, request.RemoteEndPoint, "because they requested to join a session that does not exist.");
-            request.RejectForce();
+            await request.RejectAsync(force: true);
             return;
         }
 
-        var peer = request.Accept();
+        var peer = await request.AcceptAsync();
         keyedSession.OnJoin(peer);
         _sessionsByPeer[peer.Id] = keyedSession;
     }
@@ -87,20 +93,8 @@ public class RelayServer : INetEventListener
         _logger.LogInformation($"Peer {peer.Id} disconnected: {disconnectInfo.Reason} {disconnectInfo.SocketErrorCode}");
         if (_sessionsByPeer.TryGetValue(peer.Id, out var session))
         {
-            session.OnLeave(peer);
+            await session.OnLeave(peer);
             _sessionsByPeer.Remove(peer.Id);
         }
-    }
-    
-    public async Task OnNetworkError(IPEndPoint endPoint, SocketError socketError)
-    {
-    }
-    
-    public async Task OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
-    {
-    }
-    
-    public async Task OnNetworkLatencyUpdate(NetPeer peer, int latency)
-    {
     }
 }
