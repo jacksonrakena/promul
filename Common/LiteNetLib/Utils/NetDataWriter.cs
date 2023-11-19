@@ -224,6 +224,11 @@ namespace LiteNetLib.Utils
             _position += length;
         }
 
+        public void Put(ArraySegment<byte> data)
+        {
+            Put(data.Array, data.Offset, data.Count);
+        }
+
         public void Put(byte[] data)
         {
             if (_autoResize)

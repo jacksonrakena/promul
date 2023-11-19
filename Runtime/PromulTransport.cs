@@ -58,9 +58,9 @@ namespace Promul.Runtime
             SimulateMaxLatency = Math.Max(SimulateMinLatency, SimulateMaxLatency);
         }
 
-        void Update()
+        async void Update()
         {
-            m_NetManager?.PollEvents();
+            if (m_NetManager != null) await m_NetManager?.PollEvents();
         }
 
         public override bool IsSupported => Application.platform != RuntimePlatform.WebGLPlayer;
@@ -109,7 +109,7 @@ namespace Promul.Runtime
                 // Relayed data
                 case RelayControlMessageType.Data:
                     {
-                        InvokeOnTransportEvent(NetworkEvent.Data, author, new ArraySegment<byte>(message.Data), Time.time);
+                        InvokeOnTransportEvent(NetworkEvent.Data, author, message.Data, Time.time);
                         break;
                     }
                 case RelayControlMessageType.KickFromRelay:

@@ -441,7 +441,6 @@ namespace LiteNetLib.Utils
             _position = _data.Length;
             return outgoingData;
         }
-
         public void GetBytes(byte[] destination, int start, int count)
         {
             Buffer.BlockCopy(_data, _position, destination, start, count);

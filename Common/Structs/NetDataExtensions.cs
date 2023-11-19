@@ -8,7 +8,7 @@ namespace Promul.Common.Structs
             var rcm = new RelayControlMessage();
             rcm.Type = (RelayControlMessageType) reader.GetByte();
             rcm.AuthorClientId = reader.GetULong();
-            rcm.Data = reader.GetRemainingBytes();
+            rcm.Data = reader.GetRemainingBytesSegment();
             return rcm;
         }
         public static void Put(this NetDataWriter writer, RelayControlMessage rcm)
