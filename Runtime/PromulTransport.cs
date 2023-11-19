@@ -130,7 +130,7 @@ namespace Promul.Runtime
         {
             _ = Task.Run(async () =>
             {
-                //_ = m_NetManager.Bind(IPAddress.Any, IPAddress.None, 4000);
+                _ = m_NetManager.Bind(IPAddress.Any, IPAddress.None, 0);
                 var joinPacket = new NetDataWriter();
                 joinPacket.Put(joinCode);
                 _relayPeer = await m_NetManager.ConnectAsync(NetUtils.MakeEndPoint(Address, Port), joinPacket);
