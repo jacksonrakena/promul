@@ -88,6 +88,7 @@ namespace Promul.Runtime
         {
             var message = reader.Get();
             var author = message.AuthorClientId;
+            Debug.Log($"Receive from {peer.Id} author={author} type={message.Type:G}");
             switch (message.Type)
             {
                 // Either we are host and a client has connected,
