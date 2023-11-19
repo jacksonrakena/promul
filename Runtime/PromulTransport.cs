@@ -126,11 +126,11 @@ namespace Promul.Runtime
             return NetworkEvent.Nothing;
         }
 
-        async Task<bool> ConnectToRelayServer(string joinCode)
+        bool ConnectToRelayServer(string joinCode)
         {
             _ = Task.Run(async () =>
             {
-                _ = m_NetManager.Bind(IPAddress.Any, IPAddress.None, 4000);
+                //_ = m_NetManager.Bind(IPAddress.Any, IPAddress.None, 4000);
                 var joinPacket = new NetDataWriter();
                 joinPacket.Put(joinCode);
                 _relayPeer = await m_NetManager.ConnectAsync(NetUtils.MakeEndPoint(Address, Port), joinPacket);
@@ -142,13 +142,13 @@ namespace Promul.Runtime
         public override bool StartClient()
         {
             m_HostType = HostType.Client;
-            return ConnectToRelayServer("TEST").GetAwaiter().GetResult();
+            return ConnectToRelayServer("TEST");
         }
 
         public override bool StartServer()
         {
             m_HostType = HostType.Server;
-            return ConnectToRelayServer("TEST").GetAwaiter().GetResult();
+            return ConnectToRelayServer("TEST");
         }
 
         public override void DisconnectRemoteClient(ulong clientId)
