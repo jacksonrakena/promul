@@ -66,7 +66,7 @@ namespace LiteNetLib
             packet.RawData[HeaderSize-1] = (byte)addressBytes.Size;
             for (int i = 0; i < addressBytes.Size; i++)
                 packet.RawData[HeaderSize + i] = addressBytes[i];
-            if (connectData.Array != null) Buffer.BlockCopy(connectData.Array, connectData.Count, packet.RawData, HeaderSize + addressBytes.Size, connectData.Count);
+            if (connectData.Array != null) Buffer.BlockCopy(connectData.Array, connectData.Offset, packet.RawData, HeaderSize + addressBytes.Size, connectData.Count);
             return packet;
         }
     }
