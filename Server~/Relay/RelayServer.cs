@@ -46,7 +46,7 @@ public class RelayServer : INetEventListener
         _sessionsByCode.Remove(session.JoinCode);
     }
 
-    public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
+    public async Task OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
         var packet = reader.Get();
 
@@ -61,7 +61,7 @@ public class RelayServer : INetEventListener
         session.OnReceive(peer, packet, deliveryMethod);
     }
     
-    public void OnConnectionRequest(ConnectionRequest request)
+    public async Task OnConnectionRequest(ConnectionRequest request)
     {
         var joinCode = request.Data.GetString();
         
@@ -78,11 +78,11 @@ public class RelayServer : INetEventListener
         _sessionsByPeer[peer.Id] = keyedSession;
     }
     
-    public void OnPeerConnected(NetPeer peer)
+    public async Task OnPeerConnected(NetPeer peer)
     {
         _logger.LogInformation($"Connected to {peer.EndPoint}");
     }
-    public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
+    public async Task OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
     {
         _logger.LogInformation($"Peer {peer.Id} disconnected: {disconnectInfo.Reason} {disconnectInfo.SocketErrorCode}");
         if (_sessionsByPeer.TryGetValue(peer.Id, out var session))
@@ -92,16 +92,15 @@ public class RelayServer : INetEventListener
         }
     }
     
-    public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
+    public async Task OnNetworkError(IPEndPoint endPoint, SocketError socketError)
     {
     }
     
-    public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
+    public async Task OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
     {
     }
     
-    public void OnNetworkLatencyUpdate(NetPeer peer, int latency)
+    public async Task OnNetworkLatencyUpdate(NetPeer peer, int latency)
     {
     }
-    
 }

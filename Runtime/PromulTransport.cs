@@ -2,6 +2,7 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading.Tasks;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using Promul.Common.Structs;
@@ -86,7 +87,7 @@ namespace Promul.Runtime
             }, qos);
         }
 
-        void INetEventListener.OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod)
+        async Task INetEventListener.OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod)
         {
             var message = reader.Get();
             var author = message.AuthorClientId;
@@ -111,8 +112,9 @@ namespace Promul.Runtime
                         InvokeOnTransportEvent(NetworkEvent.Data, author, new ArraySegment<byte>(message.Data), Time.time);
                         break;
                     }
+                case RelayControlMessageType.KickFromRelay:
                 default:
-                    Debug.LogError("Unknown Promul control byte " + message.Type);
+                    Debug.LogError("Ignoring Promul control byte " + message.Type);
                     break;
             }
 
@@ -127,25 +129,25 @@ namespace Promul.Runtime
             return NetworkEvent.Nothing;
         }
 
-        bool ConnectToRelayServer()
+        async Task<bool> ConnectToRelayServer(string joinCode)
         {
             if (!m_NetManager.Start()) return false;
             var joinPacket = new NetDataWriter();
-            joinPacket.Put("TEST");
-            _relayPeer = m_NetManager.Connect(Address, Port, joinPacket);
+            joinPacket.Put(joinCode);
+            _relayPeer = await m_NetManager.Connect(Address, Port, joinPacket);
             return true;
         }
 
         public override bool StartClient()
         {
             m_HostType = HostType.Client;
-            return ConnectToRelayServer();
+            return ConnectToRelayServer("TEST").GetAwaiter().GetResult();
         }
 
         public override bool StartServer()
         {
             m_HostType = HostType.Server;
-            return ConnectToRelayServer();
+            return ConnectToRelayServer("TEST").GetAwaiter().GetResult();
         }
 
         public override void DisconnectRemoteClient(ulong clientId)
@@ -200,30 +202,30 @@ namespace Promul.Runtime
                 _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
             };
         }
-        void INetEventListener.OnConnectionRequest(ConnectionRequest request)
+        async Task INetEventListener.OnConnectionRequest(ConnectionRequest request)
         {
             request.RejectForce();
         }
-        void INetEventListener.OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
+        async Task INetEventListener.OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
             Debug.Log("Disconnected " + disconnectInfo.Reason.ToString() + " " + disconnectInfo.SocketErrorCode.ToString());
             if (disconnectInfo.Reason != DisconnectReason.DisconnectPeerCalled)
                 InvokeOnTransportEvent(NetworkEvent.TransportFailure, 0, new ArraySegment<byte>(), Time.time);
         }
 
-        void INetEventListener.OnPeerConnected(NetPeer peer)
+        async Task INetEventListener.OnPeerConnected(NetPeer peer)
         {
         }
 
-        void INetEventListener.OnNetworkError(IPEndPoint endPoint, SocketError socketError)
+        async Task INetEventListener.OnNetworkError(IPEndPoint endPoint, SocketError socketError)
         {
         }
 
-        void INetEventListener.OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
+        async Task INetEventListener.OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
         {
         }
 
-        void INetEventListener.OnNetworkLatencyUpdate(NetPeer peer, int latency)
+        async Task INetEventListener.OnNetworkLatencyUpdate(NetPeer peer, int latency)
         {
         }
 

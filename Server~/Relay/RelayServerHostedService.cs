@@ -19,7 +19,7 @@ public class RelayServerHostedService : BackgroundService
         
         while (!stoppingToken.IsCancellationRequested)
         {
-            _relayServer.NetManager.PollEvents();
+            await _relayServer.NetManager.PollEvents();
             await Task.Delay(15, stoppingToken);
         }
     }

@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 using LiteNetLib.Layers;
 using LiteNetLib.Utils;
 
@@ -500,7 +501,7 @@ namespace LiteNetLib
                 readerSource: eventData);
         }
 
-        private void CreateEvent(
+        private async Task CreateEvent(
             NetEvent.EType type,
             NetPeer peer = null,
             IPEndPoint remoteEndPoint = null,
@@ -545,7 +546,7 @@ namespace LiteNetLib
 
             if (unsyncEvent || _manualMode)
             {
-                ProcessEvent(evt);
+                await ProcessEvent(evt);
             }
             else
             {
@@ -560,14 +561,14 @@ namespace LiteNetLib
             }
         }
 
-        private void ProcessEvent(NetEvent evt)
+        private async Task ProcessEvent(NetEvent evt)
         {
             NetDebug.Write("[NM] Processing event: " + evt.Type);
             bool emptyData = evt.DataReader.IsNull;
             switch (evt.Type)
             {
                 case NetEvent.EType.Connect:
-                    _netEventListener.OnPeerConnected(evt.Peer);
+                    await _netEventListener.OnPeerConnected(evt.Peer);
                     break;
                 case NetEvent.EType.Disconnect:
                     var info = new DisconnectInfo
@@ -576,28 +577,28 @@ namespace LiteNetLib
                         AdditionalData = evt.DataReader,
                         SocketErrorCode = evt.ErrorCode
                     };
-                    _netEventListener.OnPeerDisconnected(evt.Peer, info);
+                    await _netEventListener.OnPeerDisconnected(evt.Peer, info);
                     break;
                 case NetEvent.EType.Receive:
-                    _netEventListener.OnNetworkReceive(evt.Peer, evt.DataReader, evt.ChannelNumber, evt.DeliveryMethod);
+                    await _netEventListener.OnNetworkReceive(evt.Peer, evt.DataReader, evt.ChannelNumber, evt.DeliveryMethod);
                     break;
                 case NetEvent.EType.ReceiveUnconnected:
-                    _netEventListener.OnNetworkReceiveUnconnected(evt.RemoteEndPoint, evt.DataReader, UnconnectedMessageType.BasicMessage);
+                    await _netEventListener.OnNetworkReceiveUnconnected(evt.RemoteEndPoint, evt.DataReader, UnconnectedMessageType.BasicMessage);
                     break;
                 case NetEvent.EType.Broadcast:
-                    _netEventListener.OnNetworkReceiveUnconnected(evt.RemoteEndPoint, evt.DataReader, UnconnectedMessageType.Broadcast);
+                    await _netEventListener.OnNetworkReceiveUnconnected(evt.RemoteEndPoint, evt.DataReader, UnconnectedMessageType.Broadcast);
                     break;
                 case NetEvent.EType.Error:
-                    _netEventListener.OnNetworkError(evt.RemoteEndPoint, evt.ErrorCode);
+                    await _netEventListener.OnNetworkError(evt.RemoteEndPoint, evt.ErrorCode);
                     break;
                 case NetEvent.EType.ConnectionLatencyUpdated:
-                    _netEventListener.OnNetworkLatencyUpdate(evt.Peer, evt.Latency);
+                    await _netEventListener.OnNetworkLatencyUpdate(evt.Peer, evt.Latency);
                     break;
                 case NetEvent.EType.ConnectionRequest:
-                    _netEventListener.OnConnectionRequest(evt.ConnectionRequest);
+                    await _netEventListener.OnConnectionRequest(evt.ConnectionRequest);
                     break;
                 case NetEvent.EType.MessageDelivered:
-                    _deliveryEventListener.OnMessageDelivered(evt.Peer, evt.UserData);
+                    await _deliveryEventListener.OnMessageDelivered(evt.Peer, evt.UserData);
                     break;
                 case NetEvent.EType.PeerAddressChanged:
                     _peersLock.EnterUpgradeableReadLock();
@@ -613,7 +614,7 @@ namespace LiteNetLib
                     }
                     _peersLock.ExitUpgradeableReadLock();
                     if(previousAddress != null && _peerAddressChangedListener != null)
-                        _peerAddressChangedListener.OnPeerAddressChanged(evt.Peer, previousAddress);
+                        await _peerAddressChangedListener.OnPeerAddressChanged(evt.Peer, previousAddress);
                     break;
             }
             //Recycle if not message
@@ -1470,7 +1471,7 @@ namespace LiteNetLib
         /// Receive all pending events. Call this in game update code
         /// In Manual mode it will call also socket Receive (which can be slow)
         /// </summary>
-        public void PollEvents()
+        public async Task PollEvents()
         {
             if (_manualMode)
             {
@@ -1494,7 +1495,7 @@ namespace LiteNetLib
             while (pendingEvent != null)
             {
                 var next = pendingEvent.Next;
-                ProcessEvent(pendingEvent);
+                await ProcessEvent(pendingEvent);
                 pendingEvent = next;
             }
         }
@@ -1507,7 +1508,7 @@ namespace LiteNetLib
         /// <param name="key">Connection key</param>
         /// <returns>New NetPeer if new connection, Old NetPeer if already connected, null peer if there is ConnectionRequest awaiting</returns>
         /// <exception cref="InvalidOperationException">Manager is not running. Call <see cref="Start()"/></exception>
-        public NetPeer Connect(string address, int port, string key)
+        public Task<NetPeer?> Connect(string address, int port, string key)
         {
             return Connect(address, port, NetDataWriter.FromString(key));
         }
@@ -1520,7 +1521,7 @@ namespace LiteNetLib
         /// <param name="connectionData">Additional data for remote peer</param>
         /// <returns>New NetPeer if new connection, Old NetPeer if already connected, null peer if there is ConnectionRequest awaiting</returns>
         /// <exception cref="InvalidOperationException">Manager is not running. Call <see cref="Start()"/></exception>
-        public NetPeer Connect(string address, int port, NetDataWriter connectionData)
+        public async Task<NetPeer?> Connect(string address, int port, NetDataWriter connectionData)
         {
             IPEndPoint ep;
             try
@@ -1529,10 +1530,10 @@ namespace LiteNetLib
             }
             catch
             {
-                CreateEvent(NetEvent.EType.Disconnect, disconnectReason: DisconnectReason.UnknownHost);
+                await CreateEvent(NetEvent.EType.Disconnect, disconnectReason: DisconnectReason.UnknownHost);
                 return null;
             }
-            return Connect(ep, connectionData);
+            return await Connect(ep, connectionData);
         }
 
         /// <summary>
@@ -1542,7 +1543,7 @@ namespace LiteNetLib
         /// <param name="key">Connection key</param>
         /// <returns>New NetPeer if new connection, Old NetPeer if already connected, null peer if there is ConnectionRequest awaiting</returns>
         /// <exception cref="InvalidOperationException">Manager is not running. Call <see cref="Start()"/></exception>
-        public NetPeer Connect(IPEndPoint target, string key)
+        public Task<NetPeer?> Connect(IPEndPoint target, string key)
         {
             return Connect(target, NetDataWriter.FromString(key));
         }
@@ -1554,7 +1555,7 @@ namespace LiteNetLib
         /// <param name="connectionData">Additional data for remote peer</param>
         /// <returns>New NetPeer if new connection, Old NetPeer if already connected, null peer if there is ConnectionRequest awaiting</returns>
         /// <exception cref="InvalidOperationException">Manager is not running. Call <see cref="Start()"/></exception>
-        public NetPeer Connect(IPEndPoint target, NetDataWriter connectionData)
+        public async Task<NetPeer?> Connect(IPEndPoint target, NetDataWriter connectionData)
         {
             if (!IsRunning)
                 throw new InvalidOperationException("Client is not running");

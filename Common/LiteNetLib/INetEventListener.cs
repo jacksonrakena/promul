@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.Sockets;
+using System.Threading.Tasks;
 using LiteNetLib.Utils;
 
 namespace LiteNetLib
@@ -59,21 +60,21 @@ namespace LiteNetLib
         /// New remote peer connected to host, or client connected to remote host
         /// </summary>
         /// <param name="peer">Connected peer object</param>
-        void OnPeerConnected(NetPeer peer);
+        Task OnPeerConnected(NetPeer peer);
 
         /// <summary>
         /// Peer disconnected
         /// </summary>
         /// <param name="peer">disconnected peer</param>
         /// <param name="disconnectInfo">additional info about reason, errorCode or data received with disconnect message</param>
-        void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo);
+        Task OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo);
 
         /// <summary>
         /// Network error (on send or receive)
         /// </summary>
         /// <param name="endPoint">From endPoint (can be null)</param>
         /// <param name="socketError">Socket error</param>
-        void OnNetworkError(IPEndPoint endPoint, SocketError socketError);
+        Task OnNetworkError(IPEndPoint endPoint, SocketError socketError);
 
         /// <summary>
         /// Received some data
@@ -82,7 +83,7 @@ namespace LiteNetLib
         /// <param name="reader">DataReader containing all received data</param>
         /// <param name="channelNumber">Number of channel at which packet arrived</param>
         /// <param name="deliveryMethod">Type of received packet</param>
-        void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod);
+        Task OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod);
 
         /// <summary>
         /// Received unconnected message
@@ -90,20 +91,20 @@ namespace LiteNetLib
         /// <param name="remoteEndPoint">From address (IP and Port)</param>
         /// <param name="reader">Message data</param>
         /// <param name="messageType">Message type (simple, discovery request or response)</param>
-        void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType);
+        Task OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType);
 
         /// <summary>
         /// Latency information updated
         /// </summary>
         /// <param name="peer">Peer with updated latency</param>
         /// <param name="latency">latency value in milliseconds</param>
-        void OnNetworkLatencyUpdate(NetPeer peer, int latency);
+        Task OnNetworkLatencyUpdate(NetPeer peer, int latency);
 
         /// <summary>
         /// On peer connection requested
         /// </summary>
         /// <param name="request">Request information (EndPoint, internal id, additional data)</param>
-        void OnConnectionRequest(ConnectionRequest request);
+        Task OnConnectionRequest(ConnectionRequest request);
     }
 
     public interface IDeliveryEventListener
@@ -113,7 +114,7 @@ namespace LiteNetLib
         /// </summary>
         /// <param name="peer"></param>
         /// <param name="userData"></param>
-        void OnMessageDelivered(NetPeer peer, object userData);
+        Task OnMessageDelivered(NetPeer peer, object userData);
     }
 
     public interface INtpEventListener
@@ -122,7 +123,7 @@ namespace LiteNetLib
         /// Ntp response
         /// </summary>
         /// <param name="packet"></param>
-        void OnNtpResponse(NtpPacket packet);
+        Task OnNtpResponse(NtpPacket packet);
     }
 
     public interface IPeerAddressChangedListener
@@ -132,21 +133,21 @@ namespace LiteNetLib
         /// </summary>
         /// <param name="peer">Peer that changed address (with new address)</param>
         /// <param name="previousAddress">previous IP</param>
-        void OnPeerAddressChanged(NetPeer peer, IPEndPoint previousAddress);
+        Task OnPeerAddressChanged(NetPeer peer, IPEndPoint previousAddress);
     }
 
     public class EventBasedNetListener : INetEventListener, IDeliveryEventListener, INtpEventListener, IPeerAddressChangedListener
     {
-        public delegate void OnPeerConnected(NetPeer peer);
-        public delegate void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo);
-        public delegate void OnNetworkError(IPEndPoint endPoint, SocketError socketError);
-        public delegate void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod);
-        public delegate void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType);
-        public delegate void OnNetworkLatencyUpdate(NetPeer peer, int latency);
-        public delegate void OnConnectionRequest(ConnectionRequest request);
-        public delegate void OnDeliveryEvent(NetPeer peer, object userData);
-        public delegate void OnNtpResponseEvent(NtpPacket packet);
-        public delegate void OnPeerAddressChangedEvent(NetPeer peer, IPEndPoint previousAddress);
+        public delegate Task OnPeerConnected(NetPeer peer);
+        public delegate Task OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo);
+        public delegate Task OnNetworkError(IPEndPoint endPoint, SocketError socketError);
+        public delegate Task OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod);
+        public delegate Task OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType);
+        public delegate Task OnNetworkLatencyUpdate(NetPeer peer, int latency);
+        public delegate Task OnConnectionRequest(ConnectionRequest request);
+        public delegate Task OnDeliveryEvent(NetPeer peer, object userData);
+        public delegate Task OnNtpResponseEvent(NtpPacket packet);
+        public delegate Task OnPeerAddressChangedEvent(NetPeer peer, IPEndPoint previousAddress);
 
         public event OnPeerConnected PeerConnectedEvent;
         public event OnPeerDisconnected PeerDisconnectedEvent;
@@ -209,64 +210,74 @@ namespace LiteNetLib
             PeerAddressChangedEvent = null;
         }
 
-        void INetEventListener.OnPeerConnected(NetPeer peer)
+        Task INetEventListener.OnPeerConnected(NetPeer peer)
         {
             if (PeerConnectedEvent != null)
-                PeerConnectedEvent(peer);
+                return PeerConnectedEvent(peer);
+            return Task.CompletedTask;
         }
 
-        void INetEventListener.OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
+        Task INetEventListener.OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
             if (PeerDisconnectedEvent != null)
-                PeerDisconnectedEvent(peer, disconnectInfo);
+                return PeerDisconnectedEvent(peer, disconnectInfo);
+            return Task.CompletedTask;
         }
 
-        void INetEventListener.OnNetworkError(IPEndPoint endPoint, SocketError socketErrorCode)
+        Task INetEventListener.OnNetworkError(IPEndPoint endPoint, SocketError socketErrorCode)
         {
             if (NetworkErrorEvent != null)
-                NetworkErrorEvent(endPoint, socketErrorCode);
+                return NetworkErrorEvent(endPoint, socketErrorCode);
+            return Task.CompletedTask;
         }
 
-        void INetEventListener.OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
+        Task INetEventListener.OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
         {
             if (NetworkReceiveEvent != null)
-                NetworkReceiveEvent(peer, reader, channelNumber, deliveryMethod);
+                return NetworkReceiveEvent(peer, reader, channelNumber, deliveryMethod);
+            return Task.CompletedTask;
         }
 
-        void INetEventListener.OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
+        Task INetEventListener.OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
         {
             if (NetworkReceiveUnconnectedEvent != null)
-                NetworkReceiveUnconnectedEvent(remoteEndPoint, reader, messageType);
+                return NetworkReceiveUnconnectedEvent(remoteEndPoint, reader, messageType);
+            return Task.CompletedTask;
         }
 
-        void INetEventListener.OnNetworkLatencyUpdate(NetPeer peer, int latency)
+        Task INetEventListener.OnNetworkLatencyUpdate(NetPeer peer, int latency)
         {
             if (NetworkLatencyUpdateEvent != null)
-                NetworkLatencyUpdateEvent(peer, latency);
+                return NetworkLatencyUpdateEvent(peer, latency);
+            return Task.CompletedTask;
         }
 
-        void INetEventListener.OnConnectionRequest(ConnectionRequest request)
+        Task INetEventListener.OnConnectionRequest(ConnectionRequest request)
         {
             if (ConnectionRequestEvent != null)
-                ConnectionRequestEvent(request);
+                return ConnectionRequestEvent(request);
+            return Task.CompletedTask;
         }
 
-        void IDeliveryEventListener.OnMessageDelivered(NetPeer peer, object userData)
+        Task IDeliveryEventListener.OnMessageDelivered(NetPeer peer, object userData)
         {
             if (DeliveryEvent != null)
-                DeliveryEvent(peer, userData);
+                return DeliveryEvent(peer, userData);
+            return Task.CompletedTask;
         }
 
-        void INtpEventListener.OnNtpResponse(NtpPacket packet)
+        Task INtpEventListener.OnNtpResponse(NtpPacket packet)
         {
             if (NtpResponseEvent != null)
-                NtpResponseEvent(packet);
+                return NtpResponseEvent(packet);
+            return Task.CompletedTask;
         }
 
-        void IPeerAddressChangedListener.OnPeerAddressChanged(NetPeer peer, IPEndPoint previousAddress)
+        Task IPeerAddressChangedListener.OnPeerAddressChanged(NetPeer peer, IPEndPoint previousAddress)
         {
             if (PeerAddressChangedEvent != null)
-                PeerAddressChangedEvent(peer, previousAddress);
+                return PeerAddressChangedEvent(peer, previousAddress);
+            return Task.CompletedTask;
         }
     }
 }
