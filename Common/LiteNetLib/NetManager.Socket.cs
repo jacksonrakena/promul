@@ -220,11 +220,11 @@ namespace LiteNetLib
 
                 if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
-                    try { socket.DontFragment = true; }
-                    catch (SocketException e)
-                    {
-                        NetDebug.WriteError($"[B]DontFragment error: {e.SocketErrorCode}");
-                    }
+                    // try { socket.DontFragment = true; }
+                    // catch (SocketException e)
+                    // {
+                    //     NetDebug.WriteError($"[B]DontFragment error: {e.SocketErrorCode}");
+                    // }
                 }
             }
             //Bind
