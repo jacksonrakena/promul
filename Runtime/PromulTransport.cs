@@ -158,7 +158,7 @@ namespace Promul.Runtime
 
         public override void DisconnectLocalClient()
         {
-            m_NetManager.DisconnectAllPeersAsync();
+            _ = Task.Run(() => m_NetManager.DisconnectAllPeersAsync());
             _relayPeer = null;
         }
 
@@ -170,8 +170,12 @@ namespace Promul.Runtime
 
         public override void Shutdown()
         {
+            m_NetManager.OnConnectionRequest -= OnConnectionRequest;
+            m_NetManager.OnPeerDisconnected -= OnPeerDisconnected;
+            m_NetManager.OnReceive -= OnNetworkReceive;
+            
             _cts.Cancel();
-            _ = m_NetManager?.StopAsync();
+            _ = Task.Run(() => m_NetManager.StopAsync());
             _relayPeer = null;
             m_HostType = HostType.None;
         }
