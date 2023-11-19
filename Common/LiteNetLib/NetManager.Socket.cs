@@ -144,8 +144,6 @@ namespace LiteNetLib
                     NetDebug.WriteError("[NM] SocketReceiveThread error: " + e );
                 }
             }
-            _udpSocketv4?.Dispose();
-            _udpSocketv6?.Dispose();
         }
 
         /// <summary>
@@ -438,10 +436,12 @@ namespace LiteNetLib
 
             return broadcastSuccess || multicastSuccess;
         }
-        void CloseSocket()
+        public void CloseSocket()
         {
             _udpSocketv4?.Close();
             _udpSocketv6?.Close();
+            _udpSocketv4?.Dispose();
+            _udpSocketv6?.Dispose();
             _udpSocketv4 = null;
             _udpSocketv6 = null;
         }

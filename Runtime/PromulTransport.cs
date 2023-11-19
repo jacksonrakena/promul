@@ -174,6 +174,8 @@ namespace Promul.Runtime
             m_NetManager.OnConnectionRequest -= OnConnectionRequest;
             m_NetManager.OnPeerDisconnected -= OnPeerDisconnected;
             m_NetManager.OnReceive -= OnNetworkReceive;
+            m_NetManager.CloseSocket();
+            m_NetManager.StopAsync().Wait();
             
             _cts.Cancel();
             _ = Task.Run(() => m_NetManager.StopAsync());
