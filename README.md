@@ -1,11 +1,15 @@
 # Promul
-Using the [LibNetLib](https://github.com/RevenantX/LiteNetLib) reliable UDP library, Promul is a simple, lightweight, and easy-to-use relay server implementation for [Unity Netcode for GameObjects](https://docs-multiplayer.unity3d.com/netcode/current/about/). 
+Promul is a simple, lightweight, and easy-to-use relay server and session management implementation for [Unity Netcode for GameObjects](https://docs-multiplayer.unity3d.com/netcode/current/about/). 
   
-Promul serves as a free and open-source alternative to [Unity Relay](https://unity.com/products/relay). In the future, we would like to add automatic provisioning of Promul instances behind a REST API, including a secret join code mechanism, to bring Promul into feature parity with Unity Relay.
+Promul uses a heavily-modified version of the [LibNetLib](https://github.com/RevenantX/LiteNetLib) library for its internal networking, converting the library from a thread-based non-async model to a Task-based Asynchronous Programming (TAP)-based implementation.
+  
+Promul is intended to be a free and open-source alternative to [Unity Relay](https://unity.com/products/relay). It supports join secret-based session management, with a REST API for creating and deleting sessions, and an admin UI for managing active sessions.
 
 ## Setup
-#### Relay server
-Clone this repository and build and run the program under [/Server](/Server). Promul will bind on port 4098.
+#### Relay server and API
+Clone this repository and build and run the program under [/Server](/Server). The relay server will bind on UDP port 4098 while the API server will bind on TCP port 3000.
+
+To create a new session, call `PUT /session/create`. The API will respond with the join code.
 
 #### Relay client (Transport)
 Install the transport by adding it in the Unity Package Manager by git URL:  
@@ -57,6 +61,7 @@ sequenceDiagram
 ## Copyright
 &copy; 2023 Firework Eyes Studio (NZBN 9429048922678) under the MIT License.
 
+This project uses a heavily modified version of LibNetLib.  
 LiteNetLib &copy; 2020 Ruslan Pyrch, under the following license:
 ```
 MIT License
