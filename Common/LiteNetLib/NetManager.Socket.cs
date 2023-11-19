@@ -98,6 +98,15 @@ namespace LiteNetLib
             EndPoint bufferEndPoint4 = new IPEndPoint(IPAddress.Any, 0);
             EndPoint bufferEndPoint6 = new IPEndPoint(IPAddress.IPv6Any, 0);
 
+            _ = Task.Run(async () =>
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    await DisconnectIdlers();
+                    await Task.Delay(DisconnectTimeout, cancellationToken);
+                }
+            }, cancellationToken);
+            
             while (!cancellationToken.IsCancellationRequested)
             {
                 try

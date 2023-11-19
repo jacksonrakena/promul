@@ -127,7 +127,6 @@ namespace LiteNetLib
         private const int MinLatencyThreshold = 5;
 #endif
 
-        private readonly AutoResetEvent _updateTriggerEvent = new AutoResetEvent(true);
 
         private readonly Dictionary<IPEndPoint, NetPeer> _peersDict = new Dictionary<IPEndPoint, NetPeer>(new IPEndPointComparer());
         private readonly Dictionary<IPEndPoint, ConnectionRequest> _requestsDict = new Dictionary<IPEndPoint, ConnectionRequest>(new IPEndPointComparer());
@@ -514,61 +513,6 @@ namespace LiteNetLib
             // }
         }
 
-        //Update function
-        // private void UpdateLogic()
-        // {
-        //     var peersToRemove = new List<NetPeer>();
-        //     var stopwatch = new Stopwatch();
-        //     stopwatch.Start();
-        //
-        //     while (IsRunning)
-        //     {
-        //         try
-        //         {
-        //             ProcessDelayedPackets();
-        //             int elapsed = (int)stopwatch.ElapsedMilliseconds;
-        //             elapsed = elapsed <= 0 ? 1 : elapsed;
-        //             stopwatch.Restart();
-        //
-        //             for (var netPeer = _headPeer; netPeer != null; netPeer = netPeer.NextPeer)
-        //             {
-        //                 if (netPeer.ConnectionState == ConnectionState.Disconnected &&
-        //                     netPeer.TimeSinceLastPacket > DisconnectTimeout)
-        //                 {
-        //                     peersToRemove.Add(netPeer);
-        //                 }
-        //                 else
-        //                 {
-        //                     netPeer.Update(elapsed);
-        //                 }
-        //             }
-        //
-        //             if (peersToRemove.Count > 0)
-        //             {
-        //                 _peersLock.EnterWriteLock();
-        //                 for (int i = 0; i < peersToRemove.Count; i++)
-        //                     RemovePeerInternal(peersToRemove[i]);
-        //                 _peersLock.ExitWriteLock();
-        //                 peersToRemove.Clear();
-        //             }
-        //
-        //             ProcessNtpRequests(elapsed);
-        //
-        //             int sleepTime = UpdateTime - (int)stopwatch.ElapsedMilliseconds;
-        //             if (sleepTime > 0)
-        //                 _updateTriggerEvent.WaitOne(sleepTime);
-        //         }
-        //         catch (ThreadAbortException)
-        //         {
-        //             return;
-        //         }
-        //         catch (Exception e)
-        //         {
-        //             NetDebug.WriteError("[NM] LogicThread error: " + e);
-        //         }
-        //     }
-        //     stopwatch.Stop();
-        // }
 
         [Conditional("DEBUG")]
         private void ProcessDelayedPackets()
@@ -726,7 +670,6 @@ namespace LiteNetLib
                 _requestsDict.Add(remoteEndPoint, req);
             }
             NetDebug.Write($"[NM] Creating request event: {connRequest.ConnectionTime}");
-            Console.WriteLine("Creating request");
             await CreateEvent(NetEvent.NetEventType.ConnectionRequest, connectionRequest: req);
         }
 
@@ -855,9 +798,7 @@ namespace LiteNetLib
                 netPeer.Statistics.IncrementPacketsReceived();
                 netPeer.Statistics.AddBytesReceived(originalPacketSize);
             }
-
             
-            Console.WriteLine($"Packet = {packet.Property:G}");
             switch (packet.Property)
             {
                 case PacketProperty.ConnectRequest:
@@ -1021,22 +962,18 @@ namespace LiteNetLib
         }
 
         /// <summary>
-        /// Connect to remote host
+        ///     Connects to a remote host by IP address.
         /// </summary>
-        /// <param name="target">Server end point (ip and port)</param>
-        /// <param name="connectionData">Additional data for remote peer</param>
-        /// <returns>New NetPeer if new connection, Old NetPeer if already connected, null peer if there is ConnectionRequest awaiting</returns>
-        /// <exception cref="InvalidOperationException">Manager is not running. Call <see cref="Bind"/></exception>
+        /// <param name="target">The endpoint of the remote host.</param>
+        /// <param name="connectionData">Additional data presented to the remote host.</param>
+        /// <returns>The NetPeer, if connection was successful. Returns null if we are waiting for a response.</returns>
         public async Task<NetPeer?> ConnectAsync(IPEndPoint target, ArraySegment<byte> connectionData)
         {
-            lock(_requestsDict)
-            {
-                if (_requestsDict.ContainsKey(target))
-                    return null;
-            }
+            if (_requestsDict.ContainsKey(target))
+                return null;
 
             byte connectionNumber = 0;
-            _peersLock.EnterUpgradeableReadLock();
+            //_peersLock.EnterUpgradeableReadLock();
             if (_peersDict.TryGetValue(target, out var peer))
             {
                 switch (peer.ConnectionState)
@@ -1044,7 +981,7 @@ namespace LiteNetLib
                     //just return already connected peer
                     case ConnectionState.Connected:
                     case ConnectionState.Outgoing:
-                        _peersLock.ExitUpgradeableReadLock();
+                        //_peersLock.ExitUpgradeableReadLock();
                         return peer;
                 }
                 //else reconnect
@@ -1056,7 +993,7 @@ namespace LiteNetLib
             //And send connection request
             peer = await NetPeer.ConnectToAsync(this, target, GetNextPeerId(), connectionNumber, connectionData);
             AddPeer(peer);
-            _peersLock.ExitUpgradeableReadLock();
+            //_peersLock.ExitUpgradeableReadLock();
 
             return peer;
         }
@@ -1080,7 +1017,7 @@ namespace LiteNetLib
 
             //Stop
             CloseSocket();
-            _updateTriggerEvent.Set();
+            
 
             //clear peers
             _peersLock.EnterWriteLock();
