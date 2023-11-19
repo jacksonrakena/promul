@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -59,6 +60,9 @@ namespace Promul.Runtime
             SimulateMaxLatency = Math.Max(SimulateMinLatency, SimulateMaxLatency);
         }
 
+        ConcurrentQueue<(NetworkEvent, ulong, ArraySegment<byte>, float)> _queue = new ConcurrentQueue<(NetworkEvent, ulong, ArraySegment<byte>, float)>();
+        
+
         public override bool IsSupported => Application.platform != RuntimePlatform.WebGLPlayer;
 
         NetPeer? _relayPeer;
@@ -95,21 +99,22 @@ namespace Promul.Runtime
                 // or we're a client and we're connected.
                 case RelayControlMessageType.Connected:
                     {
-                        InvokeOnTransportEvent(NetworkEvent.Connect, author, default, Time.time);
+                        _queue.Enqueue((NetworkEvent.Connect, author, default, Time.time));
                         break;
                     }
                 // A client has disconnected from the relay.
                 case RelayControlMessageType.Disconnected:
                     {
+                        _queue.Enqueue((NetworkEvent.Disconnect, author, default, Time.time));
                         InvokeOnTransportEvent(NetworkEvent.Disconnect, author, default, Time.time);
                         break;
                     }
                 // Relayed data
                 case RelayControlMessageType.Data:
-                    {
-                        InvokeOnTransportEvent(NetworkEvent.Data, author, message.Data, Time.time);
+                {
+                    _queue.Enqueue((NetworkEvent.Data, author, message.Data, Time.time));
                         break;
-                    }
+                }
                 case RelayControlMessageType.KickFromRelay:
                 default:
                     Debug.LogError("Ignoring Promul control byte " + message.Type);
@@ -124,6 +129,13 @@ namespace Promul.Runtime
             clientId = 0;
             receiveTime = Time.realtimeSinceStartup;
             payload = new ArraySegment<byte>();
+            if (_queue.TryDequeue(out var i))
+            {
+                clientId = i.Item2;
+                receiveTime = i.Item4;
+                payload = i.Item3;
+                return i.Item1;
+            }
             return NetworkEvent.Nothing;
         }
 
