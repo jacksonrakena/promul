@@ -2,6 +2,7 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using LiteNetLib;
 using LiteNetLib.Utils;
@@ -61,6 +62,7 @@ namespace Promul.Runtime
         public override bool IsSupported => Application.platform != RuntimePlatform.WebGLPlayer;
 
         NetPeer? _relayPeer;
+        CancellationTokenSource _cts = new CancellationTokenSource();
 
         public void SendControl(RelayControlMessage rcm, NetworkDelivery qos)
         {
@@ -132,8 +134,8 @@ namespace Promul.Runtime
                 var joinPacket = new NetDataWriter();
                 joinPacket.Put(joinCode);
                 _relayPeer = await m_NetManager.ConnectAsync(NetUtils.MakeEndPoint(Address, Port), joinPacket);
-                await m_NetManager.ListenAsync();
-            });
+                await m_NetManager.ListenAsync(_cts.Token);
+            }, _cts.Token);
             return true;
         }
 
@@ -168,7 +170,8 @@ namespace Promul.Runtime
 
         public override void Shutdown()
         {
-            m_NetManager?.StopAsync();
+            _cts.Cancel();
+            _ = m_NetManager?.StopAsync();
             _relayPeer = null;
             m_HostType = HostType.None;
         }
