@@ -13,19 +13,6 @@ using Promul.Common.Networking.Utils;
 
 namespace Promul.Common.Networking
 {
-    public sealed class NetPacketReader : BinaryReader
-    {
-        private NetPacket? _packet;
-        private readonly NetManager _manager;
-
-        internal NetPacketReader(NetManager manager, NetPacket? packet, int headerSize) :
-            base(new MemoryStream(packet?.Data.Array ?? Array.Empty<byte>(), packet?.Data.Offset + headerSize ?? 0, packet?.Data.Count ?? 0))
-        {
-            _manager = manager;
-            _packet = packet;
-        }
-    }
-    
     /// <summary>
     /// Main class for all network operations. Can be used as client and/or server.
     /// </summary>
@@ -59,11 +46,6 @@ namespace Promul.Common.Networking
         /// Enable messages receiving without connection. (with SendUnconnectedMessage method)
         /// </summary>
         public bool UnconnectedMessagesEnabled = false;
-
-        /// <summary>
-        /// Enable nat punch messages
-        /// </summary>
-        //public bool NatPunchEnabled = false;
 
         /// <summary>
         /// Interval for latency detection and checking connection (in milliseconds)
@@ -132,19 +114,9 @@ namespace Promul.Common.Networking
         public bool EnableStatistics = false;
 
         /// <summary>
-        /// NatPunchModule for NAT hole punching operations
-        /// </summary>
-        //public readonly NatPunchModule NatPunchModule;
-
-        /// <summary>
         /// Local EndPoint (host and port)
         /// </summary>
         public int LocalPort { get; private set; }
-
-        /// <summary>
-        /// Automatically recycle NetPacketReader after OnReceive event
-        /// </summary>
-        public bool AutoRecycle;
 
         /// <summary>
         /// IPv6 support
@@ -548,13 +520,13 @@ namespace Promul.Common.Networking
                 case PacketProperty.Broadcast:
                     if (!BroadcastReceiveEnabled)
                         return;
-                    await OnConnectionlessReceive(remoteEndPoint, new NetPacketReader(this, packet, packet.GetHeaderSize()), UnconnectedMessageType.Broadcast);
+                    await OnConnectionlessReceive(remoteEndPoint, packet.CreateReader(packet.GetHeaderSize()), UnconnectedMessageType.Broadcast);
                     return;
                 case PacketProperty.UnconnectedMessage:
                     if (!UnconnectedMessagesEnabled)
                         return;
                     
-                    await OnConnectionlessReceive(remoteEndPoint, new NetPacketReader(this, packet, packet.GetHeaderSize()), UnconnectedMessageType.BasicMessage);
+                    await OnConnectionlessReceive(remoteEndPoint, packet.CreateReader(packet.GetHeaderSize()), UnconnectedMessageType.BasicMessage);
                     return;
                 case PacketProperty.NatMessage:
                     //if (NatPunchEnabled)
@@ -684,7 +656,7 @@ namespace Promul.Common.Networking
 
         internal async Task CreateReceiveEvent(NetPacket packet, DeliveryMethod method, byte channelNumber, int headerSize, NetPeer fromPeer)
         {
-            if (OnReceive != null) await OnReceive(fromPeer, new NetPacketReader(this, packet, headerSize), channelNumber, method);
+            if (OnReceive != null) await OnReceive(fromPeer, packet.CreateReader(headerSize), channelNumber, method);
         }
         
         /// <summary>
@@ -889,7 +861,7 @@ namespace Promul.Common.Networking
             }
             if (OnPeerDisconnected != null) await OnPeerDisconnected(peer, new DisconnectInfo { Reason = reason, 
                 SocketErrorCode = socketErrorCode,
-                AdditionalData = new NetPacketReader(this, eventData, eventData?.GetHeaderSize() ?? 0) });
+                AdditionalData = eventData.CreateReader(eventData?.GetHeaderSize() ?? 0) });
         }
         
 

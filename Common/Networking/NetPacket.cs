@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using Promul.Common.Networking.Utils;
 
 namespace Promul.Common.Networking
@@ -160,6 +161,12 @@ namespace Promul.Common.Networking
             int headerSize = HeaderSizes[property];
             bool fragmented = (Data[0] & 0x80) != 0;
             return Data.Count >= headerSize && (!fragmented || Data.Count >= headerSize + NetConstants.FragmentHeaderSize);
+        }
+
+        public BinaryReader CreateReader(int headerSize)
+        {
+            return new BinaryReader(new MemoryStream(Data.Array, Data.Offset + headerSize,
+                Data.Count));
         }
     }
 }

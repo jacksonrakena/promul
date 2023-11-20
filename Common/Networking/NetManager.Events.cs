@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.IO;
+using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using Promul.Common.Networking.Data;
@@ -11,8 +12,8 @@ namespace Promul.Common.Networking
         public delegate Task OnPeerConnectedEvent(NetPeer peer);
         public delegate Task OnPeerDisconnectedEvent(NetPeer peer, DisconnectInfo disconnectInfo);
         public delegate Task OnNetworkErrorEvent(IPEndPoint endPoint, SocketError socketError);
-        public delegate Task OnNetworkReceiveEvent(NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod);
-        public delegate Task OnConnectionlessReceiveEvent(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType);
+        public delegate Task OnNetworkReceiveEvent(NetPeer peer, BinaryReader reader, byte channel, DeliveryMethod deliveryMethod);
+        public delegate Task OnConnectionlessReceiveEvent(IPEndPoint remoteEndPoint, BinaryReader reader, UnconnectedMessageType messageType);
         public delegate Task OnNetworkLatencyUpdateEvent(NetPeer peer, int latency);
         public delegate Task OnConnectionRequestEvent(ConnectionRequest request);
         public delegate Task OnDeliveryEventEvent(NetPeer peer, object userData);

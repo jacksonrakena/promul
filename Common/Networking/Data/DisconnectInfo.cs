@@ -1,4 +1,5 @@
-﻿using System.Net.Sockets;
+﻿using System.IO;
+using System.Net.Sockets;
 
 namespace Promul.Common.Networking.Data
 {
@@ -20,6 +21,6 @@ namespace Promul.Common.Networking.Data
         /// <summary>
         /// Additional data that can be accessed (only if reason is RemoteConnectionClose)
         /// </summary>
-        public NetPacketReader AdditionalData;
+        public BinaryReader AdditionalData;
     }
 }
