@@ -93,7 +93,7 @@ namespace Promul.Common.Networking
 
         public static NetConnectAcceptPacket FromData(NetPacket packet)
         {
-            if (packet.Size != Size)
+            if (packet.Data.Count != Size)
                 return null;
 
             long connectionId = BitConverter.ToInt64(packet.Data[1..]);

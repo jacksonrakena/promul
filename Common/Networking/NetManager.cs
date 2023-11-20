@@ -18,7 +18,7 @@ namespace Promul.Common.Networking
         private readonly NetManager _manager;
 
         internal NetPacketReader(NetManager manager, NetPacket? packet, int headerSize) :
-            base(packet == null ? ArraySegment<byte>.Empty : new ArraySegment<byte>(packet.Data.Array, packet.Data.Offset+headerSize, packet.Size))
+            base(packet == null ? ArraySegment<byte>.Empty : new ArraySegment<byte>(packet.Data.Array, packet.Data.Offset+headerSize, packet.Data.Count))
         {
             _manager = manager;
             _packet = packet;
@@ -402,7 +402,7 @@ namespace Promul.Common.Networking
                     var shutdownPacket = NetPacket.FromProperty(PacketProperty.Disconnect, data.Count);
                     shutdownPacket.ConnectionNumber = request.InternalPacket.ConnectionNumber;
                     FastBitConverter.GetBytes(shutdownPacket.Data.Array, shutdownPacket.Data.Offset+1, request.InternalPacket.ConnectionTime);
-                    if (shutdownPacket.Size >= NetConstants.PossibleMtu[0])
+                    if (shutdownPacket.Data.Count >= NetConstants.PossibleMtu[0])
                         NetDebug.WriteError("[Peer] Disconnect additional data size more than MTU!");
                     else data.CopyTo(shutdownPacket.Data.Array, shutdownPacket.Data.Offset+9);
                     await SendRawAndRecycle(shutdownPacket, request.RemoteEndPoint);
@@ -527,7 +527,7 @@ namespace Promul.Common.Networking
         private async Task DebugMessageReceived(NetPacket packet, IPEndPoint remoteEndPoint)
         {
 #endif
-            var originalPacketSize = packet.Size;
+            var originalPacketSize = packet.Data.Count;
             if (EnableStatistics)
             {
                 Statistics.IncrementPacketsReceived();
@@ -538,9 +538,9 @@ namespace Promul.Common.Networking
             {
                 if (_ntpRequests.TryGetValue(remoteEndPoint, out var request))
                 {
-                    if (packet.Size < 48)
+                    if (packet.Data.Count < 48)
                     {
-                        NetDebug.Write(NetLogLevel.Trace, $"NTP response too short: {packet.Size}");
+                        NetDebug.Write(NetLogLevel.Trace, $"NTP response too short: {packet.Data.Count}");
                         return;
                     }
 
@@ -569,7 +569,7 @@ namespace Promul.Common.Networking
             {
                 int start = 0;
                 _extraPacketLayer.ProcessInboundPacket(ref remoteEndPoint, ref packet);
-                if (packet.Size == 0)
+                if (packet.Data.Count == 0)
                     return;
             }
 
@@ -629,7 +629,7 @@ namespace Promul.Common.Networking
                     {
                         if (netPeer.ConnectionState != ConnectionState.Connected)
                             return;
-                        if (packet.Size == 1)
+                        if (packet.Data.Count == 1)
                         {
                             //first reply
                             //send NetworkChanged packet
@@ -637,20 +637,20 @@ namespace Promul.Common.Networking
                             await SendRaw(NetConnectAcceptPacket.MakeNetworkChanged(netPeer), remoteEndPoint);
                             NetDebug.Write($"PeerNotFound sending connection info: {remoteEndPoint}");
                         }
-                        else if (packet.Size == 2 && packet.Data.Array[packet.Data.Offset+1] == 1)
+                        else if (packet.Data.Count == 2 && packet.Data.Array[packet.Data.Offset+1] == 1)
                         {
                             //second reply
                             await ForceDisconnectPeerAsync(netPeer, DisconnectReason.PeerNotFound, 0, null);
                         }
                     }
-                    else if (packet.Size > 1) //remote
+                    else if (packet.Data.Count > 1) //remote
                     {
                         //check if this is old peer
                         bool isOldPeer = false;
 
                         if (AllowPeerAddressChange)
                         {
-                            NetDebug.Write($"[NM] Looks like address change: {packet.Size}");
+                            NetDebug.Write($"[NM] Looks like address change: {packet.Data.Count}");
                             var remoteData = NetConnectAcceptPacket.FromData(packet);
                             if (remoteData != null &&
                                 remoteData.PeerNetworkChanged &&

@@ -546,7 +546,7 @@ namespace Promul.Common.Networking
         internal DisconnectResult ProcessDisconnect(NetPacket packet)
         {
             if ((ConnectionState == ConnectionState.Connected || ConnectionState == ConnectionState.Outgoing) &&
-                packet.Size >= 9 &&
+                packet.Data.Count >= 9 &&
                 BitConverter.ToInt64(packet.Data[1..]) == ConnectTime &&
                 packet.ConnectionNumber == _connectNum)
             {
@@ -591,7 +591,7 @@ namespace Promul.Common.Networking
                 _shutdownPacket = NetPacket.FromProperty(PacketProperty.Disconnect, data.Count);
                 _shutdownPacket.ConnectionNumber = _connectNum;
                 FastBitConverter.GetBytes(_shutdownPacket.Data.Array, _shutdownPacket.Data.Offset+1, ConnectTime);
-                if (_shutdownPacket.Size >= Mtu)
+                if (_shutdownPacket.Data.Count >= Mtu)
                 {
                     //Drop additional data
                     NetDebug.WriteError("[Peer] Disconnect additional data size more than MTU - 8!");
@@ -653,7 +653,7 @@ namespace Promul.Common.Networking
                 incomingFragments.ReceivedCount++;
 
                 //Increase total size
-                incomingFragments.TotalSize += p.Size - NetConstants.FragmentedHeaderTotalSize;
+                incomingFragments.TotalSize += p.Data.Count - NetConstants.FragmentedHeaderTotalSize;
 
                 //Check for finish
                 if (incomingFragments.ReceivedCount != fragments.Length)
@@ -666,7 +666,7 @@ namespace Promul.Common.Networking
                 for (int i = 0; i < incomingFragments.ReceivedCount; i++)
                 {
                     var fragment = fragments[i];
-                    int writtenSize = fragment.Size - NetConstants.FragmentedHeaderTotalSize;
+                    int writtenSize = fragment.Data.Count - NetConstants.FragmentedHeaderTotalSize;
 
                     if (pos+writtenSize > resultingPacket.Data.Count)
                     {
@@ -674,10 +674,10 @@ namespace Promul.Common.Networking
                         NetDebug.WriteError($"Fragment error pos: {pos + writtenSize} >= resultPacketSize: {resultingPacket.Data.Count} , totalSize: {incomingFragments.TotalSize}");
                         return;
                     }
-                    if (fragment.Size > fragment.Data.Count)
+                    if (fragment.Data.Count > fragment.Data.Count)
                     {
                         _holdedFragments.Remove(packetFragId);
-                        NetDebug.WriteError($"Fragment error size: {fragment.Size} > fragment.RawData.Length: {fragment.Data.Count}");
+                        NetDebug.WriteError($"Fragment error size: {fragment.Data.Count} > fragment.RawData.Length: {fragment.Data.Count}");
                         return;
                     }
 
@@ -710,15 +710,15 @@ namespace Promul.Common.Networking
         private async Task ProcessMtuPacket(NetPacket packet)
         {
             //header + int
-            if (packet.Size < NetConstants.PossibleMtu[0])
+            if (packet.Data.Count < NetConstants.PossibleMtu[0])
                 return;
 
             //first stage check (mtu check and mtu ok)
             int receivedMtu = BitConverter.ToInt32(packet.Data.Array, packet.Data.Offset+1);
-            int endMtuCheck = BitConverter.ToInt32(packet.Data.Array, packet.Data.Offset+packet.Size - 4);
-            if (receivedMtu != packet.Size || receivedMtu != endMtuCheck || receivedMtu > NetConstants.MaxPacketSize)
+            int endMtuCheck = BitConverter.ToInt32(packet.Data.Array, packet.Data.Offset+packet.Data.Count - 4);
+            if (receivedMtu != packet.Data.Count || receivedMtu != endMtuCheck || receivedMtu > NetConstants.MaxPacketSize)
             {
-                NetDebug.WriteError($"[MTU] Broken packet. RMTU {receivedMtu}, EMTU {endMtuCheck}, PSIZE {packet.Size}");
+                NetDebug.WriteError($"[MTU] Broken packet. RMTU {receivedMtu}, EMTU {endMtuCheck}, PSIZE {packet.Data.Count}");
                 return;
             }
 
@@ -778,7 +778,7 @@ namespace Promul.Common.Networking
                 var p = NetPacket.Empty(newMtu);// NetManager.PoolGetPacket(newMtu);
                 p.Property = PacketProperty.MtuCheck;
                 FastBitConverter.GetBytes(p.Data.Array, p.Data.Offset+1, newMtu);          //place into start
-                FastBitConverter.GetBytes(p.Data.Array, p.Data.Offset+p.Size - 4, newMtu); //and end of packet
+                FastBitConverter.GetBytes(p.Data.Array, p.Data.Offset+p.Data.Count - 4, newMtu); //and end of packet
 
                 //Must check result for MTU fix
                 if (await NetManager.SendRawAndRecycle(p, EndPoint) <= 0)
@@ -870,7 +870,7 @@ namespace Promul.Common.Networking
             {
                 case PacketProperty.Merged:
                     int pos = NetConstants.HeaderSize;
-                    while (pos < packet.Size)
+                    while (pos < packet.Data.Count)
                     {
                         ushort size = BitConverter.ToUInt16(packet.Data.Array, packet.Data.Offset+pos);
                         pos += 2;
@@ -979,7 +979,7 @@ namespace Promul.Common.Networking
         internal async Task SendUserData(NetPacket packet)
         {
             packet.ConnectionNumber = _connectNum;
-            int mergedPacketSize = NetConstants.HeaderSize + packet.Size + 2;
+            int mergedPacketSize = NetConstants.HeaderSize + packet.Data.Count + 2;
             const int sizeTreshold = 20;
             if (mergedPacketSize + sizeTreshold >= Mtu)
             {
@@ -997,10 +997,10 @@ namespace Promul.Common.Networking
             if (_mergePos + mergedPacketSize > Mtu)
                 await SendMerged();
 
-            FastBitConverter.GetBytes(_mergeData.Data.Array, _mergeData.Data.Offset+_mergePos + NetConstants.HeaderSize, (ushort)packet.Size);
+            FastBitConverter.GetBytes(_mergeData.Data.Array, _mergeData.Data.Offset+_mergePos + NetConstants.HeaderSize, (ushort)packet.Data.Count);
             packet.Data.CopyTo(_mergeData.Data.Array, _mergeData.Data.Offset+_mergePos+NetConstants.HeaderSize+2);
             //Buffer.BlockCopy(packet.RawData, 0, _mergeData.RawData, _mergePos + NetConstants.HeaderSize + 2, packet.Size);
-            _mergePos += packet.Size + 2;
+            _mergePos += packet.Data.Count + 2;
             _mergeCount++;
             //DebugWriteForce("Merged: " + _mergePos + "/" + (_mtu - 2) + ", count: " + _mergeCount);
         }

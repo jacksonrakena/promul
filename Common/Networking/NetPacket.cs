@@ -120,7 +120,6 @@ namespace Promul.Common.Networking
 
         //Data
         public ArraySegment<byte> Data { get; }
-        public int Size => Data.Count;
 
         private NetPacket(ArraySegment<byte> data, PacketProperty property = default)
         {
