@@ -1,5 +1,5 @@
-﻿using LiteNetLib;
-using LiteNetLib.Utils;
+﻿using Promul.Common.Networking;
+using Promul.Common.Networking.Data;
 using Promul.Common.Structs;
 namespace Promul.Server.Relay.Sessions;
 

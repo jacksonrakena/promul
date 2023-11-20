@@ -1,9 +1,12 @@
 ﻿using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using LiteNetLib;
+using Promul.Common.Networking;
+using Promul.Common.Networking.Data;
 using Promul.Common.Structs;
 using Promul.Server.Relay.Sessions;
+using NetManager = Promul.Common.Networking.NetManager;
+
 namespace Promul.Server.Relay;
 
 public class RelayServer

@@ -1,6 +1,6 @@
 using System;
-using LiteNetLib.Data;
-using LiteNetLib.Utils;
+using Promul.Common.Networking.Data;
+
 namespace Promul.Common.Structs
 {
     public static class NetDataExtensions

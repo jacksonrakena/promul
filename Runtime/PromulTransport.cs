@@ -5,11 +5,13 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using LiteNetLib;
-using LiteNetLib.Utils;
+using Promul.Common.Networking;
+using Promul.Common.Networking.Data;
 using Promul.Common.Structs;
 using Unity.Netcode;
 using UnityEngine;
+using NetManager = Promul.Common.Networking.NetManager;
+
 namespace Promul.Runtime
 {
     public class PromulTransport : NetworkTransport
