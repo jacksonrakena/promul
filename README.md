@@ -2,6 +2,7 @@
 Promul is a simple, lightweight, and easy-to-use relay server and session management implementation for [Unity Netcode for GameObjects](https://docs-multiplayer.unity3d.com/netcode/current/about/). 
   
 Promul uses a heavily-modified version of the [LibNetLib](https://github.com/RevenantX/LiteNetLib) library for its internal networking, converting the library from a thread-based non-async model to a Task-based Asynchronous Programming (TAP)-based implementation.
+Technical details of the networking are explained in [the networking documentation](Common/Networking/README.md).
   
 Promul is intended to be a free and open-source alternative to [Unity Relay](https://unity.com/products/relay). It supports join secret-based session management, with a REST API for creating and deleting sessions, and an admin UI for managing active sessions.
 
