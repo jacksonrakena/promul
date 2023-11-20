@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -12,66 +13,19 @@ using Promul.Common.Networking.Utils;
 
 namespace Promul.Common.Networking
 {
-    public sealed class NetPacketReader : NetDataReader
+    public sealed class NetPacketReader : BinaryReader
     {
         private NetPacket? _packet;
         private readonly NetManager _manager;
 
         internal NetPacketReader(NetManager manager, NetPacket? packet, int headerSize) :
-            base(packet == null ? ArraySegment<byte>.Empty : new ArraySegment<byte>(packet.Data.Array, packet.Data.Offset+headerSize, packet.Data.Count))
+            base(new MemoryStream(packet?.Data.Array ?? Array.Empty<byte>(), packet?.Data.Offset + headerSize ?? 0, packet?.Data.Count ?? 0))
         {
             _manager = manager;
             _packet = packet;
         }
-
-        internal void RecycleInternal()
-        {
-            Clear();
-            //if (_packet != null) _manager.PoolRecycle(_packet);
-            _packet = null;
-        }
-
-        public void Recycle()
-        {
-            if (_manager.AutoRecycle)
-                return;
-            RecycleInternal();
-        }
     }
-
-    internal sealed class NetEvent
-    {
-        public enum NetEventType
-        {
-            Connect,
-            Disconnect,
-            Receive,
-            ReceiveUnconnected,
-            Error,
-            ConnectionLatencyUpdated,
-            Broadcast,
-            ConnectionRequest,
-            MessageDelivered,
-            PeerAddressChanged
-        }
-        public NetEventType Type;
-
-        public NetPeer Peer;
-        public IPEndPoint RemoteEndPoint;
-        public object UserData;
-        public int Latency;
-        public SocketError ErrorCode;
-        public DisconnectReason DisconnectReason;
-        public ConnectionRequest ConnectionRequest;
-        public DeliveryMethod DeliveryMethod;
-        public byte ChannelNumber;
-        public NetPacketReader? DataReader;
-
-        public NetEvent(NetManager manager)
-        {
-        }
-    }
-
+    
     /// <summary>
     /// Main class for all network operations. Can be used as client and/or server.
     /// </summary>
@@ -109,7 +63,7 @@ namespace Promul.Common.Networking
         /// <summary>
         /// Enable nat punch messages
         /// </summary>
-        public bool NatPunchEnabled = false;
+        //public bool NatPunchEnabled = false;
 
         /// <summary>
         /// Interval for latency detection and checking connection (in milliseconds)
@@ -180,7 +134,7 @@ namespace Promul.Common.Networking
         /// <summary>
         /// NatPunchModule for NAT hole punching operations
         /// </summary>
-        public readonly NatPunchModule NatPunchModule;
+        //public readonly NatPunchModule NatPunchModule;
 
         /// <summary>
         /// Local EndPoint (host and port)
@@ -328,7 +282,7 @@ namespace Promul.Common.Networking
         /// <param name="extraPacketLayer">Extra processing of packages, like CRC checksum or encryption. All connected NetManagers must have same layer.</param>
         public NetManager(PacketLayerBase? extraPacketLayer = null)
         {
-            NatPunchModule = new NatPunchModule(this);
+            //NatPunchModule = new NatPunchModule(this);
             _extraPacketLayer = extraPacketLayer;
         }
 
@@ -603,8 +557,8 @@ namespace Promul.Common.Networking
                     await OnConnectionlessReceive(remoteEndPoint, new NetPacketReader(this, packet, packet.GetHeaderSize()), UnconnectedMessageType.BasicMessage);
                     return;
                 case PacketProperty.NatMessage:
-                    if (NatPunchEnabled)
-                        NatPunchModule.ProcessMessage(remoteEndPoint, packet);
+                    //if (NatPunchEnabled)
+                    //    NatPunchModule.ProcessMessage(remoteEndPoint, packet);
                     return;
             }
 

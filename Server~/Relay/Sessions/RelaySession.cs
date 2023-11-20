@@ -60,8 +60,8 @@ public class RelaySession
 
     private void Send(NetPeer to, RelayControlMessage message, DeliveryMethod method)
     {
-        var writer = new NetDataWriter();
-        writer.Put(message);
+        var writer = new BinaryWriter(new MemoryStream());
+        writer.Write(message);
         _logger.LogInformation($"Sending {message.Type} from {message.AuthorClientId} to {to.Id}");
         to.Send(writer, deliveryMethod: method);
     }

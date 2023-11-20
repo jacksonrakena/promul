@@ -5,6 +5,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
@@ -452,6 +453,12 @@ namespace Promul.Common.Networking
         public void Send(ArraySegment<byte> data, DeliveryMethod deliveryMethod = DeliveryMethod.ReliableOrdered, byte channelNumber = 0)
         {
             SendInternal(data, channelNumber, deliveryMethod);
+        }
+
+        public void Send(BinaryWriter writer, DeliveryMethod deliveryMethod = DeliveryMethod.ReliableOrdered,
+            byte channelNumber = 0)
+        {
+            Send(new BinaryReader(writer.BaseStream).ReadBytes(int.MaxValue), deliveryMethod, channelNumber);
         }
 
         private void SendInternal(

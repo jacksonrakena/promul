@@ -57,7 +57,7 @@ public class RelayServer
 
     public async Task OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
-        var packet = reader.Get();
+        var packet = reader.ReadRelayControlMessage();
 
         const string format = "Disconnecting {} ({}) because {}";
         if (!_sessionsByPeer.TryGetValue(peer.Id, out var session))
@@ -72,7 +72,7 @@ public class RelayServer
     
     public async Task OnConnectionRequest(ConnectionRequest request)
     {
-        var joinCode = request.Data.GetString();
+        var joinCode = request.Data.ReadString();
         
         if (!_sessionsByCode.TryGetValue(joinCode, out var keyedSession))
         {

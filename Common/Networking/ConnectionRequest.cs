@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
@@ -19,7 +20,7 @@ namespace Promul.Common.Networking
         private readonly NetManager _listener;
         private int _used;
 
-        public NetDataReader Data => InternalPacket.Data;
+        public BinaryReader Data => InternalPacket.Data;
 
         internal ConnectionRequestResult Result { get; private set; }
         internal NetConnectRequestPacket InternalPacket;
@@ -61,7 +62,7 @@ namespace Promul.Common.Networking
             if (!TryActivate()) return null;
             try
             {
-                if (Data.GetString() == key)
+                if (Data.ReadString() == key)
                     Result = ConnectionRequestResult.Accept;
             }
             catch

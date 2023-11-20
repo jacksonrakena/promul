@@ -3,34 +3,6 @@
 namespace Promul.Common.Networking.Data
 {
     /// <summary>
-    /// Type of message that you receive in OnNetworkReceiveUnconnected event
-    /// </summary>
-    public enum UnconnectedMessageType
-    {
-        BasicMessage,
-        Broadcast
-    }
-
-    /// <summary>
-    /// Disconnect reason that you receive in OnPeerDisconnected event
-    /// </summary>
-    public enum DisconnectReason
-    {
-        ConnectionFailed,
-        Timeout,
-        HostUnreachable,
-        NetworkUnreachable,
-        RemoteConnectionClose,
-        DisconnectPeerCalled,
-        ConnectionRejected,
-        InvalidProtocol,
-        UnknownHost,
-        Reconnect,
-        PeerToPeerConnection,
-        PeerNotFound
-    }
-
-    /// <summary>
     /// Additional information about disconnection
     /// </summary>
     public struct DisconnectInfo

@@ -88,7 +88,7 @@ namespace Promul.Runtime
 
         async Task OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod)
         {
-            var message = reader.Get();
+            var message = reader.ReadRelayControlMessage();
             var author = message.AuthorClientId;
             Debug.Log($"Receive from {peer.Id} author={author} type={message.Type:G}");
             switch (message.Type)

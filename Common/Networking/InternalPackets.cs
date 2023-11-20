@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Net;
 using Promul.Common.Networking.Data;
 using Promul.Common.Networking.Utils;
@@ -11,10 +12,10 @@ namespace Promul.Common.Networking
         public readonly long ConnectionTime;
         public byte ConnectionNumber;
         public readonly byte[] TargetAddress;
-        public readonly NetDataReader Data;
+        public readonly BinaryReader Data;
         public readonly int PeerId;
 
-        private NetConnectRequestPacket(long connectionTime, byte connectionNumber, int localId, byte[] targetAddress, NetDataReader data)
+        private NetConnectRequestPacket(long connectionTime, byte connectionNumber, int localId, byte[] targetAddress, BinaryReader data)
         {
             ConnectionTime = connectionTime;
             ConnectionNumber = connectionNumber;
@@ -47,9 +48,9 @@ namespace Promul.Common.Networking
             Buffer.BlockCopy(packet.Data.Array, packet.Data.Offset+HeaderSize, addressBytes, 0, addrSize);
 
             // Read data and create request
-            NetDataReader? reader = null;
+            BinaryReader? reader = null;
             if (packet.Data.Count > HeaderSize+addrSize)
-                reader = new NetDataReader(new ArraySegment<byte>(packet.Data.Array, packet.Data.Offset + HeaderSize + addrSize, packet.Data.Count));
+                reader = new BinaryReader(new MemoryStream(packet.Data.Array, packet.Data.Offset + HeaderSize + addrSize, packet.Data.Count));
 
             return new NetConnectRequestPacket(connectionTime, packet.ConnectionNumber, peerId, addressBytes, reader);
         }
