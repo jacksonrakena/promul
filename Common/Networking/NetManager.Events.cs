@@ -9,63 +9,60 @@ namespace Promul.Common.Networking
 {
     public partial class NetManager
     {
-        public delegate Task OnPeerConnectedEvent(NetPeer peer);
-        public delegate Task OnPeerDisconnectedEvent(NetPeer peer, DisconnectInfo disconnectInfo);
-        public delegate Task OnNetworkErrorEvent(IPEndPoint endPoint, SocketError socketError);
-        public delegate Task OnNetworkReceiveEvent(NetPeer peer, BinaryReader reader, byte channel, DeliveryMethod deliveryMethod);
-        public delegate Task OnConnectionlessReceiveEvent(IPEndPoint remoteEndPoint, BinaryReader reader, UnconnectedMessageType messageType);
-        public delegate Task OnNetworkLatencyUpdateEvent(NetPeer peer, int latency);
-        public delegate Task OnConnectionRequestEvent(ConnectionRequest request);
-        public delegate Task OnDeliveryEventEvent(NetPeer peer, object userData);
-        public delegate Task OnNtpResponseEventEvent(NtpPacket packet);
-        public delegate Task OnPeerAddressChangedEventEvent(NetPeer peer, IPEndPoint previousAddress);
+        public delegate Task PeerConnectedEvent(NetPeer peer);
+        public delegate Task PeerDisconnectedEvent(NetPeer peer, DisconnectInfo disconnectInfo);
+        public delegate Task NetworkErrorEvent(IPEndPoint endPoint, SocketError socketError);
+        public delegate Task NetworkReceiveEvent(NetPeer peer, BinaryReader reader, byte channel, DeliveryMethod deliveryMethod);
+        public delegate Task ConnectionlessReceiveEvent(IPEndPoint remoteEndPoint, BinaryReader reader, UnconnectedMessageType messageType);
+        public delegate Task NetworkLatencyUpdateEvent(NetPeer peer, int latency);
+        public delegate Task ConnectionRequestEvent(ConnectionRequest request);
+        public delegate Task DeliveryEvent(NetPeer peer, object userData);
+        public delegate Task NtpResponseEvent(NtpPacket packet);
+        public delegate Task PeerAddressChangedEvent(NetPeer peer, IPEndPoint previousAddress);
         
         /// <summary>
         ///     Invoked when a connection is made with a remote peer.
         /// </summary>
-        public event OnPeerConnectedEvent OnPeerConnected;
+        public event PeerConnectedEvent? OnPeerConnected;
 
         /// <summary>
         ///     Invoked when a connection is terminated with a remote peer.
         /// </summary>
-        public event OnPeerDisconnectedEvent OnPeerDisconnected;
+        public event PeerDisconnectedEvent? OnPeerDisconnected;
 
         /// <summary>
         ///     Invoked when a network error occurs on send or receive.
         /// </summary>
-        public event OnNetworkErrorEvent OnNetworkError;
+        public event NetworkErrorEvent? OnNetworkError;
 
         /// <summary>
         ///     Invoked when information is received from a peer.
         /// </summary>
-        public event OnNetworkReceiveEvent OnReceive;
+        public event NetworkReceiveEvent? OnReceive;
 
         /// <summary>
         ///     Invoked when a message is received from a connectionless peer.
-        ///     <see cref="UnconnectedMessagesEnabled"/> must be enabled for this event to be invoked.
+        ///     <see cref="ConnectionlessMessagesAllowed"/> must be enabled for this event to be invoked.
         /// </summary>
-        public event OnConnectionlessReceiveEvent OnConnectionlessReceive;
+        public event ConnectionlessReceiveEvent? OnConnectionlessReceive;
 
         /// <summary>
         ///     Invoked when latency is updated for a peer.
         /// </summary>
-        public event OnNetworkLatencyUpdateEvent OnNetworkLatencyUpdate;
+        public event NetworkLatencyUpdateEvent? OnNetworkLatencyUpdate;
 
         /// <summary>
         ///     Invoked when a connection is received. The handler is expected to call <see cref="ConnectionRequest.AcceptAsync"/> or <see cref="ConnectionRequest.RejectAsync"/>.
         /// </summary>
-        /// <param name="request">Request information (EndPoint, internal id, additional data)</param>
-        public event OnConnectionRequestEvent OnConnectionRequest;
+        public event ConnectionRequestEvent? OnConnectionRequest;
         
-        public event OnDeliveryEventEvent OnMessageDelivered;
+        public event DeliveryEvent? OnMessageDelivered;
         
-        public event OnNtpResponseEventEvent OnNtpResponse;
+        public event NtpResponseEvent? OnNtpResponse;
         
         /// <summary>
-        /// Called when peer address changed (when AllowPeerAddressChange is enabled)
+        /// Called when a peer address changes. This event is only called when <see cref="AllowPeerAddressChange"/> is enabled.
         /// </summary>
-        /// <param name="peer">Peer that changed address (with new address)</param>
-        /// <param name="previousAddress">previous IP</param>
-        public event OnPeerAddressChangedEventEvent OnPeerAddressChanged;
+        public event PeerAddressChangedEvent? OnPeerAddressChanged;
     }
 }

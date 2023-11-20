@@ -1,15 +1,11 @@
 using System;
 using System.Collections.Concurrent;
 using System.Net;
-using System.Net.Sockets;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Promul.Common.Networking;
 using Promul.Common.Networking.Data;
 using Promul.Common.Structs;
-using Unity.Netcode;
-using UnityEngine;
 using NetManager = Promul.Common.Networking.NetManager;
 
 namespace Promul.Runtime
@@ -198,13 +194,13 @@ namespace Promul.Runtime
                 PingInterval = SecondsToMilliseconds(PingInterval),
                 DisconnectTimeout = SecondsToMilliseconds(DisconnectTimeout),
                 ReconnectDelay = SecondsToMilliseconds(ReconnectDelay),
-                MaxConnectAttempts = MaxConnectAttempts,
+                MaximumConnectionAttempts = MaxConnectAttempts,
                 SimulatePacketLoss = SimulatePacketLossChance > 0,
-                SimulationPacketLossChance = SimulatePacketLossChance,
+                SimulatePacketLossChance = SimulatePacketLossChance,
                 SimulateLatency = SimulateMaxLatency > 0,
                 SimulationMinLatency = SimulateMinLatency,
                 SimulationMaxLatency = SimulateMaxLatency,
-                IPv6Enabled = false
+                Ipv6Enabled = false
             };
 
             m_NetManager.OnConnectionRequest += OnConnectionRequest;

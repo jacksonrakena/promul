@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Net;
-using Promul.Common.Networking.Data;
 using Promul.Common.Networking.Utils;
 
 namespace Promul.Common.Networking

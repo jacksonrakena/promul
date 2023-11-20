@@ -2,7 +2,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -14,7 +13,8 @@ using Promul.Common.Networking.Utils;
 namespace Promul.Common.Networking
 {
     /// <summary>
-    /// Main class for all network operations. Can be used as client and/or server.
+    ///     This class represents the entry-point to Promul Networking communications.
+    ///     It is responsible for creating, managing, and destroying peers, and managing the socket.
     /// </summary>
     public partial class NetManager
     {
@@ -30,123 +30,134 @@ namespace Promul.Common.Networking
         private const int MinLatencyThreshold = 5;
 #endif
         
-        private readonly Dictionary<IPEndPoint, NetPeer> _peersDict = new Dictionary<IPEndPoint, NetPeer>(new IPEndPointComparer());
-        private readonly Dictionary<IPEndPoint, ConnectionRequest> _requestsDict = new Dictionary<IPEndPoint, ConnectionRequest>(new IPEndPointComparer());
-        private readonly ConcurrentDictionary<IPEndPoint, NtpRequest> _ntpRequests = new ConcurrentDictionary<IPEndPoint, NtpRequest>(new IPEndPointComparer());
+        private readonly Dictionary<IPEndPoint, NetPeer> _peers = new(new IPEndPointComparer());
+        private readonly Dictionary<IPEndPoint, ConnectionRequest> _connectionRequests = new(new IPEndPointComparer());
+        private readonly ConcurrentDictionary<IPEndPoint, NtpRequest> _ntpRequests = new(new IPEndPointComparer());
         private volatile NetPeer? _headPeer;
         private int _connectedPeersCount;
-        private readonly List<NetPeer> _connectedPeerListCache = new List<NetPeer>();
+        private readonly List<NetPeer> _connectedPeerListCache = new();
         private NetPeer[] _peersArray = new NetPeer[32];
         private readonly PacketLayerBase? _extraPacketLayer;
         private int _lastPeerId;
-        private ConcurrentQueue<int> _peerIds = new ConcurrentQueue<int>();
+        private ConcurrentQueue<int> _peerIds = new();
         private byte _channelsCount = 1;
 
         /// <summary>
-        /// Enable messages receiving without connection. (with SendUnconnectedMessage method)
+        ///     Allow messages to be received from peers that the manager has not established a connection with.
+        ///     To send a connectionless message, call <see cref="SendConnectionlessMessageAsync"/>.
         /// </summary>
-        public bool UnconnectedMessagesEnabled = false;
+        public bool ConnectionlessMessagesAllowed { get; set; } = false;
 
         /// <summary>
-        /// Interval for latency detection and checking connection (in milliseconds)
+        ///     The interval, in milliseconds, at which to send ping messages to active peers.
         /// </summary>
-        public int PingInterval = 1000;
+        public int PingInterval { get; set; } = 1000;
 
         /// <summary>
-        /// If NetManager doesn't receive any packet from remote peer during this time (in milliseconds) then connection will be closed
-        /// (including library internal keepalive packets)
+        ///     The maximum time, in milliseconds, that the manager will allow before disconnecting a peer for inactivity.
+        ///     All clients must have a <see cref="PingInterval"/> lower than this value to avoid unintentional timeouts.
         /// </summary>
-        public int DisconnectTimeout = 5000;
+        public int DisconnectTimeout { get; set; } = 5000;
 
         /// <summary>
-        /// Simulate packet loss by dropping random amount of packets. (Works only in DEBUG mode)
+        ///     Whether to enable the packet loss simulator.
+        ///     This setting will not do anything if the DEBUG constant is not defined.
         /// </summary>
-        public bool SimulatePacketLoss = false;
+        public bool SimulatePacketLoss { get; set; } = false;
 
         /// <summary>
-        /// Simulate latency by holding packets for random time. (Works only in DEBUG mode)
+        ///     Whether to simulate latency by holding packets for a random period of time before sending.
+        ///     This setting will not do anything if the DEBUG constant is not defined.
         /// </summary>
-        public bool SimulateLatency = false;
+        public bool SimulateLatency { get; set; } = false;
 
         /// <summary>
-        /// Chance of packet loss when simulation enabled. value in percents (1 - 100).
+        ///     The chance (percentage between 0 and 100) of packet loss.
+        ///     Requires <see cref="SimulatePacketLoss"/> to be enabled.
         /// </summary>
-        public int SimulationPacketLossChance = 10;
+        public int SimulatePacketLossChance { get; set; } = 10;
 
         /// <summary>
-        /// Minimum simulated latency (in milliseconds)
+        ///     The minimum latency, in milliseconds, to add when <see cref="SimulateLatency"/> is enabled.
         /// </summary>
-        public int SimulationMinLatency = 30;
+        public int SimulationMinLatency { get; set; } = 30;
 
         /// <summary>
-        /// Maximum simulated latency (in milliseconds)
+        ///     The maximum latency, in milliseconds, to add when <see cref="SimulateLatency"/> is enabled.
         /// </summary>
-        public int SimulationMaxLatency = 100;
+        public int SimulationMaxLatency { get; set; } = 100;
 
         /// <summary>
-        /// Allows receive broadcast packets
+        ///     Whether to receive broadcast messages. When this is disabled, the manager
+        ///     will ignore all broadcast messages.
         /// </summary>
-        public bool BroadcastReceiveEnabled = false;
+        public bool BroadcastMessagesAllowed { get; set; } = false;
 
         /// <summary>
-        /// Delay between initial connection attempts (in milliseconds)
+        ///     The delay, in milliseconds, to wait before attempting a reconnect.
         /// </summary>
-        public int ReconnectDelay = 500;
+        public int ReconnectDelay { get; set; } = 500;
 
         /// <summary>
-        /// Maximum connection attempts before client stops and call disconnect event.
+        ///     The maximum connection attempts the manger will make before stopping and calling <see cref="OnPeerDisconnected"/>.
         /// </summary>
-        public int MaxConnectAttempts = 10;
+        public int MaximumConnectionAttempts { get; set; } = 10;
 
         /// <summary>
+        /// TODO UPDATE
         /// Enables socket option "ReuseAddress" for specific purposes
         /// </summary>
-        public bool ReuseAddress = false;
+        public bool ReuseAddress { get; set; } = false;
 
         /// <summary>
-        /// Statistics of all connections
+        ///     The recorded statistics. This value will be empty unless <see cref="RecordNetworkStatistics"/> is enabled.
         /// </summary>
-        public readonly NetStatistics Statistics = new NetStatistics();
+        public NetStatistics Statistics { get; } = new NetStatistics();
 
         /// <summary>
-        /// Toggles the collection of network statistics for the instance and all known peers
+        ///     Whether to record network statistics for the manager and all known peers.
+        ///     If this value is true, <see cref="Statistics"/> will be updated with statistics information.
         /// </summary>
-        public bool EnableStatistics = false;
+        public bool RecordNetworkStatistics { get; set; } = false;
 
         /// <summary>
-        /// Local EndPoint (host and port)
+        ///     The local port that the scoket is running on.
         /// </summary>
         public int LocalPort { get; private set; }
 
         /// <summary>
-        /// IPv6 support
+        ///     Whether to listen and send packets over Internet Protocol version 6 (IPv6).
         /// </summary>
-        public bool IPv6Enabled = true;
+        public bool Ipv6Enabled { get; set; } = true;
 
         /// <summary>
-        /// Override MTU for all new peers registered in this NetManager, will ignores MTU Discovery!
+        ///     If set, this value will override the MTU value for all new peers after it has been set.
+        ///     This will ignore the MTU discovery process.
         /// </summary>
-        public int MtuOverride = 0;
+        public int MtuOverride { get; set; } = 0;
 
         /// <summary>
-        /// Sets initial MTU to lowest possible value according to RFC1191 (576 bytes)
+        ///     Sets the initial MTU to the lowest possible value according to RFC-1191 (Path MTU Discovery),
+        ///     that is, 576 bytes.
         /// </summary>
-        public bool UseSafeMtu = false;
+        public bool UseSafeMtu { get; set; } = false;
+        
+        /// <summary>
+        ///     Whether to disconnect peers if the host or network is unreachable.
+        /// </summary>
+        public bool DisconnectOnUnreachable { get; set; } = false;
 
         /// <summary>
-        /// First peer. Useful for Client mode
+        ///     Allows a peer to change its remote endpoint. This occurs, for example,
+        ///     when a device moves from an LTE connection to Wi-Fi, or vice versa.
+        ///     This setting has safety implications.
+        /// </summary>
+        public bool AllowPeerAddressChange { get; set; }= false;
+
+        /// <summary>
+        ///     The first peer that this manager has connected to.
         /// </summary>
         public NetPeer? FirstPeer => _headPeer;
-
-        /// <summary>
-        /// Disconnect peers if HostUnreachable or NetworkUnreachable spawned (old behaviour 0.9.x was true)
-        /// </summary>
-        public bool DisconnectOnUnreachable = false;
-
-        /// <summary>
-        /// Allows peer change it's ip (lte to wifi, wifi to lte, etc). Use only on server
-        /// </summary>
-        public bool AllowPeerAddressChange = false;
 
         /// <summary>
         /// QoS channel count per message type (value must be between 1 and 64 channels)
@@ -163,7 +174,8 @@ namespace Promul.Common.Networking
         }
 
         /// <summary>
-        /// Returns connected peers list (with internal cached list)
+        ///     The list of all currently connected peers. This property avoids allocations by
+        ///     using an internally cached list.
         /// </summary>
         public List<NetPeer> ConnectedPeerList
         {
@@ -175,7 +187,7 @@ namespace Promul.Common.Networking
         }
 
         /// <summary>
-        /// Gets a peer by ID.
+        ///     Gets a peer by ID.
         /// </summary>
         public NetPeer? GetPeerById(int id)
         {
@@ -188,7 +200,7 @@ namespace Promul.Common.Networking
         }
 
         /// <summary>
-        /// Gets a peer by ID.
+        ///     Gets a peer by ID.
         /// </summary>
         public bool TryGetPeerById(int id, out NetPeer peer)
         {
@@ -198,11 +210,11 @@ namespace Promul.Common.Networking
             return tmp != null;
         }
 
-        public int ExtraPacketSizeForLayer => _extraPacketLayer?.ExtraPacketSizeForLayer ?? 0;
+        internal int ExtraPacketSizeForLayer => _extraPacketLayer?.ExtraPacketSizeForLayer ?? 0;
 
         private bool TryGetPeer(IPEndPoint endPoint, out NetPeer peer)
         {
-            bool result = _peersDict.TryGetValue(endPoint, out peer);
+            bool result = _peers.TryGetValue(endPoint, out peer);
             return result;
         }
 
@@ -214,7 +226,7 @@ namespace Promul.Common.Networking
                 _headPeer.PrevPeer = peer;
             }
             _headPeer = peer;
-            _peersDict.Add(peer.EndPoint, peer);
+            _peers.Add(peer.EndPoint, peer);
             if (peer.Id >= _peersArray.Length)
             {
                 int newSize = _peersArray.Length * 2;
@@ -232,7 +244,7 @@ namespace Promul.Common.Networking
 
         private void RemovePeerInternal(NetPeer peer)
         {
-            if (!_peersDict.Remove(peer.EndPoint))
+            if (!_peers.Remove(peer.EndPoint))
                 return;
             if (peer == _headPeer)
                 _headPeer = peer.NextPeer;
@@ -248,10 +260,12 @@ namespace Promul.Common.Networking
         }
 
         /// <summary>
-        /// Creates a new <see cref="NetManager"/>.
+        ///     Creates a new <see cref="NetManager"/>.
         /// </summary>
-        /// <param name="listener">Network events listener (also can implement IDeliveryEventListener)</param>
-        /// <param name="extraPacketLayer">Extra processing of packages, like CRC checksum or encryption. All connected NetManagers must have same layer.</param>
+        /// <param name="extraPacketLayer">
+        ///     An extra packet processing layer, used for utilities like CRC checksum verification or encryption layers.
+        ///     All <see cref="NetManager"/> instances connected together must have the same configured layers.
+        /// </param>
         public NetManager(PacketLayerBase? extraPacketLayer = null)
         {
             //NatPunchModule = new NatPunchModule(this);
@@ -336,7 +350,7 @@ namespace Promul.Common.Networking
             }
             else
             {
-                if (_peersDict.TryGetValue(request.RemoteEndPoint, out netPeer))
+                if (_peers.TryGetValue(request.RemoteEndPoint, out netPeer))
                 {
                     //already have peer
                 }
@@ -356,7 +370,7 @@ namespace Promul.Common.Networking
                 }
             }
 
-            _requestsDict.Remove(request.RemoteEndPoint);
+            _connectionRequests.Remove(request.RemoteEndPoint);
 
             return netPeer;
         }
@@ -409,15 +423,15 @@ namespace Promul.Common.Networking
             }
 
             ConnectionRequest req;
-            lock (_requestsDict)
+            lock (_connectionRequests)
             {
-                if (_requestsDict.TryGetValue(remoteEndPoint, out req))
+                if (_connectionRequests.TryGetValue(remoteEndPoint, out req))
                 {
                     req.UpdateRequest(connRequest);
                     return;
                 }
                 req = new ConnectionRequest(remoteEndPoint, connRequest, this);
-                _requestsDict.Add(remoteEndPoint, req);
+                _connectionRequests.Add(remoteEndPoint, req);
             }
             NetDebug.Write($"[NM] Creating request event: {connRequest.ConnectionTime}");
             if (OnConnectionRequest != null) await OnConnectionRequest(req);
@@ -426,7 +440,7 @@ namespace Promul.Common.Networking
         private async Task OnMessageReceived(NetPacket packet, IPEndPoint remoteEndPoint)
         {
 #if DEBUG
-            if (SimulatePacketLoss && _randomGenerator.NextDouble() * 100 < SimulationPacketLossChance)
+            if (SimulatePacketLoss && _randomGenerator.NextDouble() * 100 < SimulatePacketLossChance)
             {
                 //drop packet
                 return;
@@ -454,7 +468,7 @@ namespace Promul.Common.Networking
         {
 #endif
             var originalPacketSize = packet.Data.Count;
-            if (EnableStatistics)
+            if (RecordNetworkStatistics)
             {
                 Statistics.IncrementPacketsReceived();
                 Statistics.AddBytesReceived(originalPacketSize);
@@ -518,12 +532,12 @@ namespace Promul.Common.Networking
                     break;
                 //unconnected messages
                 case PacketProperty.Broadcast:
-                    if (!BroadcastReceiveEnabled)
+                    if (!BroadcastMessagesAllowed)
                         return;
                     await OnConnectionlessReceive(remoteEndPoint, packet.CreateReader(packet.GetHeaderSize()), UnconnectedMessageType.Broadcast);
                     return;
                 case PacketProperty.UnconnectedMessage:
-                    if (!UnconnectedMessagesEnabled)
+                    if (!ConnectionlessMessagesAllowed)
                         return;
                     
                     await OnConnectionlessReceive(remoteEndPoint, packet.CreateReader(packet.GetHeaderSize()), UnconnectedMessageType.BasicMessage);
@@ -535,9 +549,9 @@ namespace Promul.Common.Networking
             }
 
             //Check normal packets
-            bool peerFound = _peersDict.TryGetValue(remoteEndPoint, out var netPeer);
+            bool peerFound = _peers.TryGetValue(remoteEndPoint, out var netPeer);
 
-            if (peerFound && EnableStatistics)
+            if (peerFound && RecordNetworkStatistics)
             {
                 netPeer.Statistics.IncrementPacketsReceived();
                 netPeer.Statistics.AddBytesReceived(originalPacketSize);
@@ -660,39 +674,32 @@ namespace Promul.Common.Networking
         }
         
         /// <summary>
-        /// Send data to all connected peers
+        ///     Sends data to all connected peers using the given channel and delivery method.
+        ///     If <see cref="excludePeer"/> is set, all peers excluding that specific peer will
+        ///     receive the information.
         /// </summary>
-        /// <param name="data">Data</param>
-        /// <param name="start">Start of data</param>
-        /// <param name="length">Length of data</param>
-        /// <param name="channelNumber">Number of channel (from 0 to channelsCount - 1)</param>
-        /// <param name="options">Send options (reliable, unreliable, etc.)</param>
-        /// <param name="excludePeer">Excluded peer</param>
-        public void SendToAll(ArraySegment<byte> data, DeliveryMethod options = global::Promul.Common.Networking.DeliveryMethod.ReliableOrdered, byte channelNumber = 0, NetPeer? excludePeer = null)
+        /// <param name="data">The data to send.</param>
+        /// <param name="channelNumber">The channel number. This can range from 0 to <see cref="ChannelsCount"/> - 1.</param>
+        /// <param name="options">The delivery method to utilise.</param>
+        /// <param name="excludePeer">The (optional) peer to exclude from receiving this information.</param>
+        public void SendToAll(ArraySegment<byte> data, DeliveryMethod options = DeliveryMethod.ReliableOrdered, byte channelNumber = 0, NetPeer? excludePeer = null)
         {
-            try
+            for (var netPeer = _headPeer; netPeer != null; netPeer = netPeer.NextPeer)
             {
-                for (var netPeer = _headPeer; netPeer != null; netPeer = netPeer.NextPeer)
-                {
-                    if (netPeer != excludePeer)
-                        netPeer.Send(data, options, channelNumber);
-                }
-            }
-            finally
-            {
+                if (netPeer != excludePeer)
+                    netPeer.Send(data, options, channelNumber);
             }
         }
 
 
         /// <summary>
-        /// Send a connectionless message.
+        ///     Sends a connectionless message.
         /// </summary>
         /// <param name="data">The data to send.</param>
         /// <param name="remoteEndPoint">The destination.</param>
         /// <returns>Whether the send operation was successful.</returns>
         public async Task<bool> SendConnectionlessMessageAsync(ArraySegment<byte> data, IPEndPoint remoteEndPoint)
         {
-            //No need for CRC here, SendRaw does that
             var packet = NetPacket.FromBuffer(data);
             packet.Property = PacketProperty.UnconnectedMessage;
             return await SendRawAndRecycle(packet, remoteEndPoint) > 0;
@@ -706,11 +713,11 @@ namespace Promul.Common.Networking
         /// <returns>The NetPeer, if connection was successful. Returns null if we are waiting for a response.</returns>
         public async Task<NetPeer?> ConnectAsync(IPEndPoint target, ArraySegment<byte> connectionData)
         {
-            if (_requestsDict.ContainsKey(target))
+            if (_connectionRequests.ContainsKey(target))
                 return null;
 
             byte connectionNumber = 0;
-            if (_peersDict.TryGetValue(target, out var peer))
+            if (_peers.TryGetValue(target, out var peer))
             {
                 switch (peer.ConnectionState)
                 {
@@ -733,7 +740,7 @@ namespace Promul.Common.Networking
         }
 
         /// <summary>
-        /// Forces all peers to disconnect.
+        ///     Stops this manager, disconnecting all peers and closing the socket.
         /// </summary>
         /// <param name="sendDisconnectMessages">Whether to notify peers of pending disconnection.</param>
         public async Task StopAsync(bool sendDisconnectMessages = true)
@@ -769,7 +776,7 @@ namespace Promul.Common.Networking
         }
 
         /// <summary>
-        /// Returns the number of peers in a given connection state.
+        ///     Returns the number of peers in a given connection state.
         /// </summary>
         /// <param name="peerState">The state to query. Bit flags are supported.</param>
         /// <returns>The number of peers who are in the given state.</returns>
@@ -785,7 +792,7 @@ namespace Promul.Common.Networking
         }
 
         /// <summary>
-        /// Copies all peers in a given state into the supplied list. This method avoids allocations.
+        ///     Copies all peers in a given state into the supplied list. This method avoids allocations.
         /// </summary>
         /// <param name="peers">This list will be cleared and populated with the output of the query.</param>
         /// <param name="peerState">The state to query. Bit flags are supported.</param>
@@ -800,7 +807,7 @@ namespace Promul.Common.Networking
         }
 
         /// <summary>
-        /// Gracefully disconnects all peers.
+        ///     Gracefully disconnects all peers.
         /// </summary>
         /// <param name="data">The shutdown message to be sent to each peer.
         /// As only one message is sent, the size of this data must be less than or equal to the current MTU.</param>
@@ -814,14 +821,14 @@ namespace Promul.Common.Networking
         }
 
         /// <summary>
-        /// Gracefully disconnects a given peer.
+        ///     Gracefully disconnects a given peer.
         /// </summary>
         /// <param name="peer">The peer to disconnect.</param>
         /// <param name="data">The shutdown message to be sent to each peer.
         /// As only one message is sent, the size of this data must be less than or equal to the current MTU.</param>
         public Task DisconnectPeerAsync(NetPeer peer, ArraySegment<byte> data = default)
         {
-            return DisconnectPeerAsync(
+            return DisconnectPeerInternalAsync(
                 peer,
                 DisconnectReason.DisconnectPeerCalled,
                 0,
@@ -831,15 +838,15 @@ namespace Promul.Common.Networking
         }
         
         /// <summary>
-        /// Immediately disconnects a given peer without providing them with additional data.
+        ///     Immediately disconnects a given peer without providing them with additional data.
         /// </summary>
         /// <param name="peer">The peer to disconnect.</param>
         public Task ForceDisconnectPeerAsync(NetPeer peer, DisconnectReason reason = DisconnectReason.DisconnectPeerCalled, SocketError errorCode = 0, NetPacket? data = null)
         {
-            return DisconnectPeerAsync(peer, reason, errorCode, true, null, data);
+            return DisconnectPeerInternalAsync(peer, reason, errorCode, true, null, data);
         }
         
-        async Task DisconnectPeerAsync(
+        private async Task DisconnectPeerInternalAsync(
             NetPeer peer,
             DisconnectReason reason,
             SocketError socketErrorCode,
@@ -864,32 +871,12 @@ namespace Promul.Common.Networking
                 AdditionalData = eventData.CreateReader(eventData?.GetHeaderSize() ?? 0) });
         }
         
-
         /// <summary>
-        /// Create the requests for NTP server
+        ///     Creates a NTP request for a given address and port.
         /// </summary>
-        /// <param name="endPoint">NTP Server address.</param>
-        public void CreateNtpRequest(IPEndPoint endPoint)
-        {
-            _ntpRequests.TryAdd(endPoint, new NtpRequest(endPoint));
-        }
-
-        /// <summary>
-        /// Create the requests for NTP server
-        /// </summary>
-        /// <param name="ntpServerAddress">NTP Server address.</param>
-        /// <param name="port">port</param>
-        public void CreateNtpRequest(string ntpServerAddress, int port)
-        {
-            IPEndPoint endPoint = NetUtils.MakeEndPoint(ntpServerAddress, port);
-            _ntpRequests.TryAdd(endPoint, new NtpRequest(endPoint));
-        }
-
-        /// <summary>
-        /// Create the requests for NTP server (default port)
-        /// </summary>
-        /// <param name="ntpServerAddress">NTP Server address.</param>
-        public void CreateNtpRequest(string ntpServerAddress)
+        /// <param name="ntpServerAddress">The server address of the desired NTP server.</param>
+        /// <param name="port">The port of the desired NTP server, or, the default NTP port (123).</param>
+        public void CreateNtpRequest(string ntpServerAddress, int port = NtpRequest.DefaultPort)
         {
             IPEndPoint endPoint = NetUtils.MakeEndPoint(ntpServerAddress, NtpRequest.DefaultPort);
             _ntpRequests.TryAdd(endPoint, new NtpRequest(endPoint));

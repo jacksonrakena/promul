@@ -90,8 +90,8 @@ namespace Promul.Common.Networking
         }
 
         /// <summary>
-        /// Begins listening on all available and configured interfaces.
-        /// This method will block until the <see cref="CancellationToken"/> is cancelled.
+        ///     Begins listening on all available and configured interfaces.
+        ///     This method will block until the <see cref="CancellationToken"/> is cancelled.
         /// </summary>
         /// <param name="cancellationToken">The cancellation token used to stop the listen operation.</param>
         public async Task ListenAsync(CancellationToken cancellationToken = default)
@@ -141,7 +141,7 @@ namespace Promul.Common.Networking
         }
 
         /// <summary>
-        /// Binds the service to both IP addresses specified.
+        ///     Binds the service to both IP addresses specified.
         /// </summary>
         /// <param name="addressIPv4">The IPv4 address to bind to.</param>
         /// <param name="addressIPv6">The IPv6 address to bind to.</param>
@@ -165,7 +165,7 @@ namespace Promul.Common.Networking
 #endif
             
             //Check IPv6 support
-            if (IPv6Support && IPv6Enabled)
+            if (IPv6Support && Ipv6Enabled)
             {
                 _udpSocketv6 = new Socket(AddressFamily.InterNetworkV6, SocketType.Dgram, ProtocolType.Udp);
                 //Use one port for two sockets
@@ -372,7 +372,7 @@ namespace Promul.Common.Networking
             if (result <= 0)
                 return 0;
 
-            if (EnableStatistics)
+            if (RecordNetworkStatistics)
             {
                 Statistics.IncrementPacketsSent();
                 Statistics.AddBytesSent(data.Count);

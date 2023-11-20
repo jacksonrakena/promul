@@ -145,7 +145,7 @@ namespace Promul.Common.Networking
                     int currentBit = pendingIdx % BitsInByte;
                     if ((packet.Data[packet.Data.Offset + currentByte] & (1 << currentBit)) == 0)
                     {
-                        if (Peer.NetManager.EnableStatistics)
+                        if (Peer.NetManager.RecordNetworkStatistics)
                         {
                             Peer.Statistics.IncrementPacketLoss();
                             Peer.NetManager.Statistics.IncrementPacketLoss();

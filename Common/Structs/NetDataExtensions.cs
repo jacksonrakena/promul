@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using Promul.Common.Networking.Data;
 
 namespace Promul.Common.Structs
 {

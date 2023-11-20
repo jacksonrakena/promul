@@ -13,7 +13,7 @@ public class RelayServerHostedService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _relayServer.NetManager.IPv6Enabled = false;
+        _relayServer.NetManager.Ipv6Enabled = false;
         if (_relayServer.NetManager.Bind(IPAddress.Any, IPAddress.Any, 4098))
         {
             _logger.LogInformation($"Listening on port 4098");

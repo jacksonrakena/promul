@@ -3,7 +3,6 @@ using System.IO;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using Promul.Common.Networking.Data;
 
 namespace Promul.Common.Networking
 {
@@ -15,16 +14,25 @@ namespace Promul.Common.Networking
         RejectForce
     }
 
+    /// <summary>
+    ///     Represents a request by a remote peer to connect.
+    /// </summary>
     public class ConnectionRequest
     {
         private readonly NetManager _listener;
         private int _used;
 
+        /// <summary>
+        ///     The data sent by the remote peer.
+        /// </summary>
         public BinaryReader Data => InternalPacket.Data;
 
         internal ConnectionRequestResult Result { get; private set; }
         internal NetConnectRequestPacket InternalPacket;
 
+        /// <summary>
+        ///     The remote endpoint of the peer.
+        /// </summary>
         public readonly IPEndPoint RemoteEndPoint;
 
         internal void UpdateRequest(NetConnectRequestPacket connectRequest)
@@ -53,7 +61,7 @@ namespace Promul.Common.Networking
         }
 
         /// <summary>
-        /// Accepts the connection if the contained data is a <see cref="string"/> and matches <see cref="key"/> exactly.
+        ///     Accepts the connection if the contained data is a <see cref="string"/> and matches <see cref="key"/> exactly.
         /// </summary>
         /// <param name="key">The key to compare the data to.</param>
         /// <returns>Null, if the request was rejected. Otherwise, the connected peer.</returns>
@@ -78,7 +86,7 @@ namespace Promul.Common.Networking
         }
 
         /// <summary>
-        /// Accepts the connection.
+        ///     Accepts the connection.
         /// </summary>
         /// <returns>The connected peer, or null, if the manager was unable to activate the peer.</returns>
         public async Task<NetPeer?> AcceptAsync()
@@ -89,6 +97,11 @@ namespace Promul.Common.Networking
             return await _listener.OnConnectionRequestResolved(this, null);
         }
 
+        /// <summary>
+        ///     Rejects the connection, and sends data in response, if provided.
+        /// </summary>
+        /// <param name="data">The data to send, if provided.</param>
+        /// <param name="force">Whether to forcefully disconnect the peer after the rejection.</param>
         public async Task RejectAsync(ArraySegment<byte> data = default, bool force = false)
         {
             if (!TryActivate())

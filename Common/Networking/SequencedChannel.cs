@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -94,7 +93,7 @@ namespace Promul.Common.Networking
             bool packetProcessed = false;
             if (packet.Sequence < NetConstants.MaxSequence && relative > 0)
             {
-                if (Peer.NetManager.EnableStatistics)
+                if (Peer.NetManager.RecordNetworkStatistics)
                 {
                     Peer.Statistics.AddPacketLoss(relative - 1);
                     Peer.NetManager.Statistics.AddPacketLoss(relative - 1);

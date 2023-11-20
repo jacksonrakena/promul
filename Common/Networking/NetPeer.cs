@@ -15,7 +15,7 @@ using Promul.Common.Networking.Utils;
 namespace Promul.Common.Networking
 {
     /// <summary>
-    /// Peer connection state
+    ///     The connection state of a given peer.
     /// </summary>
     [Flags]
     public enum ConnectionState : byte
@@ -28,18 +28,41 @@ namespace Promul.Common.Networking
         Any = Outgoing | Connected | ShutdownRequested | EndPointChange
     }
 
+    /// <summary>
+    ///     The result of a connection request.
+    /// </summary>
     internal enum ConnectRequestResult
     {
         None,
-        P2PLose, //when peer connecting
-        Reconnection,  //when peer was connected
-        NewConnection  //when peer was disconnected
+        
+        P2PLose,
+        
+        /// <summary>
+        ///     The remote peer was previously connected, so this connection is a reconnection.
+        /// </summary>
+        Reconnection,
+        
+        /// <summary>
+        ///     The remote peer was disconnected, so this connection is new.
+        /// </summary>
+        NewConnection
     }
 
+    /// <summary>
+    ///     The result of a disconnection.
+    /// </summary>
     internal enum DisconnectResult
     {
         None,
+        
+        /// <summary>
+        ///     The connection was rejected.
+        /// </summary>
         Reject,
+        
+        /// <summary>
+        ///     The connection was disconnected.
+        /// </summary>
         Disconnect
     }
 
@@ -51,7 +74,7 @@ namespace Promul.Common.Networking
     }
 
     /// <summary>
-    /// Network peer. Main purpose is sending messages to specific peer.
+    ///     Represents a remote peer, managed by a given <see cref="NetManager"/> instance.
     /// </summary>
     public class NetPeer
     {
@@ -125,17 +148,17 @@ namespace Promul.Common.Networking
         private NetPacket? _connectAcceptPacket;
 
         /// <summary>
-        /// Peer ip address and port
+        ///     The remote endpoint of this peer.
         /// </summary>
         public IPEndPoint EndPoint { get; private set; }
 
         /// <summary>
-        /// Peer parent NetManager
+        ///     The <see cref="NetManager"/> instance responsible for this peer.
         /// </summary>
         public readonly NetManager NetManager;
 
         /// <summary>
-        /// Current connection state
+        ///     The current connection state of this peer.
         /// </summary>
         public ConnectionState ConnectionState { get; private set; }
 
@@ -145,63 +168,58 @@ namespace Promul.Common.Networking
         internal long ConnectTime { get; private set; }
 
         /// <summary>
-        /// Peer id can be used as key in your dictionary of peers
+        ///     The local ID of this peer.
         /// </summary>
         public readonly int Id;
 
         /// <summary>
-        /// Id assigned from server
+        ///     The server-assigned ID of this peer.
         /// </summary>
         public int RemoteId { get; private set; }
 
         /// <summary>
-        /// Current one-way ping (RTT/2) in milliseconds
+        ///     The current ping to this remote peer, in milliseconds.
+        ///     This value is calculated by halving <see cref="RoundTripTime"/>.
         /// </summary>
         public int Ping => RoundTripTime/2;
 
         /// <summary>
-        /// Round trip time in milliseconds
+        ///     The current time to complete a round-trip request to this remote peer, in milliseconds.
         /// </summary>
         public int RoundTripTime { get; private set; }
 
         /// <summary>
-        /// Current MTU - Maximum Transfer Unit ( maximum udp packet size without fragmentation )
+        ///     The current maximum transfer unit, that is, the maximum size of a given UDP packet
+        ///     that will not cause fragmentation.
         /// </summary>
-        public int Mtu { get; private set; }
+        public int MaximumTransferUnit { get; private set; }
 
         /// <summary>
-        /// Delta with remote time in ticks (not accurate)
-        /// positive - remote time > our time
+        ///     The current delta between the remote peer's time and the <see cref="NetManager"/>'s local time.
+        ///     A positive value indicates the remote peer is ahead of local time.
         /// </summary>
         public long RemoteTimeDelta { get; private set; }
 
         /// <summary>
-        /// Remote UTC time (not accurate)
+        ///     The time, in UTC, of the remote peer.
         /// </summary>
         public DateTime RemoteUtcTime => new DateTime(DateTime.UtcNow.Ticks + RemoteTimeDelta);
 
         /// <summary>
-        /// Time since last packet received (including internal library packets)
+        ///     The time, in milliseconds, since the last packet was received from this peer.
         /// </summary>
         public long TimeSinceLastPacket => _timeSinceLastPacket;
 
         internal double ResendDelay { get; private set; } = 27.0;
 
         /// <summary>
-        /// Application defined object containing data about the connection
+        ///     The network statistics for this connection.
         /// </summary>
-        public object? Tag;
+        public readonly NetStatistics Statistics = new NetStatistics();
 
-        /// <summary>
-        /// Statistics of peer connection
-        /// </summary>
-        public readonly NetStatistics Statistics;
-
-        //incoming connection constructor
         internal NetPeer(NetManager netManager, IPEndPoint remoteEndPoint, int id)
         {
             Id = id;
-            Statistics = new NetStatistics();
             NetManager = netManager;
             ResetMtu();
             EndPoint = remoteEndPoint;
@@ -247,74 +265,29 @@ namespace Promul.Common.Networking
         private void SetMtu(int mtuIdx)
         {
             _mtuIdx = mtuIdx;
-            Mtu = NetConstants.PossibleMtu[mtuIdx] - NetManager.ExtraPacketSizeForLayer;
+            MaximumTransferUnit = NetConstants.PossibleMtu[mtuIdx] - NetManager.ExtraPacketSizeForLayer;
         }
 
         private void OverrideMtu(int mtuValue)
         {
-            Mtu = mtuValue;
+            MaximumTransferUnit = mtuValue;
             _finishMtu = true;
         }
 
         /// <summary>
-        /// Returns packets count in queue for reliable channel
+        ///     Returns the number of packets in queue for sending in the given reliable channel.
         /// </summary>
-        /// <param name="channelNumber">number of channel 0-63</param>
-        /// <param name="ordered">type of channel ReliableOrdered or ReliableUnordered</param>
-        /// <returns>packets count in channel queue</returns>
-        public int GetPacketsCountInReliableQueue(byte channelNumber, bool ordered)
+        /// <param name="channelNumber">The number of the channel to query.</param>
+        /// <param name="ordered">If true, this method will query the reliable-ordered channel, otherwise, the reliable-unordered channel.</param>
+        /// <returns>The number of packets remaining in the given queue.</returns>
+        public int GetRemainingReliableQueuePacketCount(byte channelNumber, bool ordered)
         {
             int idx = channelNumber * NetConstants.ChannelTypeCount +
                        (byte) (ordered ? DeliveryMethod.ReliableOrdered : DeliveryMethod.ReliableUnordered);
             var channel = _channels[idx];
             return channel != null ? ((ReliableChannel)channel).PacketsInQueue : 0;
         }
-
-        /// <summary>
-        /// Create temporary packet (maximum size MTU - headerSize) to send later without additional copies
-        /// </summary>
-        /// <param name="deliveryMethod">Delivery method (reliable, unreliable, etc.)</param>
-        /// <param name="channelNumber">Number of channel (from 0 to channelsCount - 1)</param>
-        /// <returns>PooledPacket that you can use to write data starting from UserDataOffset</returns>
-        // public PooledPacket CreatePacketFromPool(DeliveryMethod deliveryMethod, byte channelNumber)
-        // {
-        //     //multithreaded variable
-        //     int mtu = Mtu;
-        //     var packet = NetManager.PoolGetPacket(mtu);
-        //     if (deliveryMethod == DeliveryMethod.Unreliable)
-        //     {
-        //         packet.Property = PacketProperty.Unreliable;
-        //         return new PooledPacket(packet, mtu, 0);
-        //     }
-        //     else
-        //     {
-        //         packet.Property = PacketProperty.Channeled;
-        //         return new PooledPacket(packet, mtu, (byte)(channelNumber * NetConstants.ChannelTypeCount + (byte)deliveryMethod));
-        //     }
-        // }
-
-        /// <summary>
-        /// Sends pooled packet without data copy
-        /// </summary>
-        /// <param name="packet">packet to send</param>
-        /// <param name="userDataSize">size of user data you want to send</param>
-        // public void SendPooledPacket(PooledPacket packet, int userDataSize)
-        // {
-        //     if (ConnectionState != ConnectionState.Connected)
-        //         return;
-        //     packet._packet.Size = packet.UserDataOffset + userDataSize;
-        //     if (packet._packet.Property == PacketProperty.Channeled)
-        //     {
-        //         CreateChannel(packet._channelNumber).AddToQueue(packet._packet);
-        //     }
-        //     else
-        //     {
-        //         _unreliableChannelSemaphore.Wait();
-        //         _unreliableChannel.Enqueue(packet._packet);
-        //         _unreliableChannelSemaphore.Release();
-        //     }
-        // }
-
+        
         private ChannelBase CreateChannel(byte idx)
         {
             ChannelBase newChannel = _channels[idx];
@@ -342,7 +315,7 @@ namespace Promul.Common.Networking
             return newChannel;
         }
 
-        public static async Task<NetPeer> ConnectToAsync(NetManager manager, IPEndPoint remote, int id, byte connectionNumber, ArraySegment<byte> data)
+        internal static async Task<NetPeer> ConnectToAsync(NetManager manager, IPEndPoint remote, int id, byte connectionNumber, ArraySegment<byte> data)
         {
             var time = DateTime.UtcNow.Ticks;
             var packet = NetConnectRequestPacket.Make(data, remote.Serialize(), time, id);
@@ -359,7 +332,7 @@ namespace Promul.Common.Networking
             return peer;
         }
         
-        public static async Task<NetPeer> AcceptAsync(NetManager netManager, ConnectionRequest request, int id)
+        internal static async Task<NetPeer> AcceptAsync(NetManager netManager, ConnectionRequest request, int id)
         {
             var peer = new NetPeer(netManager, request.RemoteEndPoint, id, request.InternalPacket.ConnectionTime, request.InternalPacket.ConnectionNumber)
             {
@@ -428,33 +401,47 @@ namespace Promul.Common.Networking
         }
 
         /// <summary>
-        /// Gets maximum size of packet that will be not fragmented.
+        ///     Gets the maximum size of user-provided data that can be sent without fragmentation.
+        ///     This method subtracts the size of the relevant packet headers.
         /// </summary>
-        /// <param name="options">Type of packet that you want send</param>
-        /// <returns>size in bytes</returns>
-        public int GetMaxSinglePacketSize(DeliveryMethod options)
+        /// <param name="options">The type of packet to be calculated.</param>
+        /// <returns>The maximum transmission unit size, in bytes, for the queried packet type.</returns>
+        public int GetUserMaximumTransmissionUnit(DeliveryMethod options)
         {
-            return Mtu - NetPacket.GetHeaderSize(options == DeliveryMethod.Unreliable ? PacketProperty.Unreliable : PacketProperty.Channeled);
+            return MaximumTransferUnit - NetPacket.GetHeaderSize(options == DeliveryMethod.Unreliable ? PacketProperty.Unreliable : PacketProperty.Channeled);
         }
 
         /// <summary>
-        /// Send data to peer
+        ///     Sends a data stream to the remote peer. This method will queue the data in the correct
+        ///     delivery channel, so completion of this method does NOT indicate completion of the
+        ///     sending process.
         /// </summary>
-        /// <param name="data">Data</param>
-        /// <param name="start">Start of data</param>
-        /// <param name="length">Length of data</param>
-        /// <param name="channelNumber">Number of channel (from 0 to channelsCount - 1)</param>
-        /// <param name="deliveryMethod">Delivery method (reliable, unreliable, etc.)</param>
+        /// <param name="data">The data to transmit.</param>
+        /// <param name="channelNumber">The number of channel to send on.</param>
+        /// <param name="deliveryMethod">The delivery method to send the data.</param>
         /// <exception cref="TooBigPacketException">
-        ///     If size exceeds maximum limit:<para/>
-        ///     MTU - headerSize bytes for Unreliable<para/>
-        ///     Fragment count exceeded ushort.MaxValue<para/>
+        ///     Thrown in the following instances:<br />
+        ///     - The size of <see cref="data"/> exceeds <see cref="GetUserMaximumTransmissionUnit"/> if <see cref="DeliveryMethod"/> is <see cref="DeliveryMethod.Unreliable"/>.<br />
+        ///     - The number of computed fragments exceeds <see cref="ushort.MaxValue"/>.
         /// </exception>
         public void Send(ArraySegment<byte> data, DeliveryMethod deliveryMethod = DeliveryMethod.ReliableOrdered, byte channelNumber = 0)
         {
             SendInternal(data, channelNumber, deliveryMethod);
         }
 
+        /// <summary>
+        ///     Sends a data stream to the remote peer. This method will queue the data in the correct
+        ///     delivery channel, so completion of this method does NOT indicate completion of the
+        ///     sending process.
+        /// </summary>
+        /// <param name="writer">The data to transmit.</param>
+        /// <param name="channelNumber">The number of channel to send on.</param>
+        /// <param name="deliveryMethod">The delivery method to send the data.</param>
+        /// <exception cref="TooBigPacketException">
+        ///     Thrown in the following instances:<br />
+        ///     - The size of <see cref="writer"/> exceeds <see cref="GetUserMaximumTransmissionUnit"/> if <see cref="DeliveryMethod"/> is <see cref="DeliveryMethod.Unreliable"/>.<br />
+        ///     - The number of computed fragments exceeds <see cref="ushort.MaxValue"/>.
+        /// </exception>
         public void Send(BinaryWriter writer, DeliveryMethod deliveryMethod = DeliveryMethod.ReliableOrdered,
             byte channelNumber = 0)
         {
@@ -490,7 +477,7 @@ namespace Promul.Common.Networking
             //Check fragmentation
             int headerSize = NetPacket.GetHeaderSize(property);
             //Save mtu for multithread
-            int mtu = Mtu;
+            int mtu = MaximumTransferUnit;
             if (data.Count + headerSize > mtu)
             {
                 //if cannot be fragmented
@@ -598,7 +585,7 @@ namespace Promul.Common.Networking
                 _shutdownPacket = NetPacket.FromProperty(PacketProperty.Disconnect, data.Count);
                 _shutdownPacket.ConnectionNumber = _connectNum;
                 FastBitConverter.GetBytes(_shutdownPacket.Data.Array, _shutdownPacket.Data.Offset+1, ConnectTime);
-                if (_shutdownPacket.Data.Count >= Mtu)
+                if (_shutdownPacket.Data.Count >= MaximumTransferUnit)
                 {
                     //Drop additional data
                     NetDebug.WriteError("[Peer] Disconnect additional data size more than MTU - 8!");
@@ -736,7 +723,7 @@ namespace Promul.Common.Networking
                 packet.Property = PacketProperty.MtuOk;
                 await NetManager.SendRawAndRecycle(packet, EndPoint);
             }
-            else if(receivedMtu > Mtu && !_finishMtu) //MtuOk
+            else if(receivedMtu > MaximumTransferUnit && !_finishMtu) //MtuOk
             {
                 //invalid packet
                 if (receivedMtu != NetConstants.PossibleMtu[_mtuIdx + 1] - NetManager.ExtraPacketSizeForLayer)
@@ -753,7 +740,7 @@ namespace Promul.Common.Networking
                 if (_mtuIdx == NetConstants.PossibleMtu.Length - 1)
                     _finishMtu = true;
                 //NetManager.PoolRecycle(packet);
-                NetDebug.Write("[MTU] ok. Increase to: " + Mtu);
+                NetDebug.Write("[MTU] ok. Increase to: " + MaximumTransferUnit);
             }
         }
 
@@ -973,7 +960,7 @@ namespace Promul.Common.Networking
                 //_mergeData.RawData, NetConstants.HeaderSize + 2, _mergePos - 2, _remoteEndPoint);
             }
 
-            if (NetManager.EnableStatistics)
+            if (NetManager.RecordNetworkStatistics)
             {
                 Statistics.IncrementPacketsSent();
                 Statistics.AddBytesSent(bytesSent);
@@ -988,12 +975,12 @@ namespace Promul.Common.Networking
             packet.ConnectionNumber = _connectNum;
             int mergedPacketSize = NetConstants.HeaderSize + packet.Data.Count + 2;
             const int sizeTreshold = 20;
-            if (mergedPacketSize + sizeTreshold >= Mtu)
+            if (mergedPacketSize + sizeTreshold >= MaximumTransferUnit)
             {
                 NetDebug.Write(NetLogLevel.Trace, "[P]SendingPacket: " + packet.Property);
                 int bytesSent = await NetManager.SendRaw(packet, EndPoint);
 
-                if (NetManager.EnableStatistics)
+                if (NetManager.RecordNetworkStatistics)
                 {
                     Statistics.IncrementPacketsSent();
                     Statistics.AddBytesSent(bytesSent);
@@ -1001,7 +988,7 @@ namespace Promul.Common.Networking
 
                 return;
             }
-            if (_mergePos + mergedPacketSize > Mtu)
+            if (_mergePos + mergedPacketSize > MaximumTransferUnit)
                 await SendMerged();
 
             FastBitConverter.GetBytes(_mergeData.Data.Array, _mergeData.Data.Offset+_mergePos + NetConstants.HeaderSize, (ushort)packet.Data.Count);
@@ -1048,7 +1035,7 @@ namespace Promul.Common.Networking
                     {
                         _connectTimer = 0;
                         _connectAttempts++;
-                        if (_connectAttempts > NetManager.MaxConnectAttempts)
+                        if (_connectAttempts > NetManager.MaximumConnectionAttempts)
                         {
                             await NetManager.ForceDisconnectPeerAsync(this, DisconnectReason.ConnectionFailed, 0, null);
                             return;
