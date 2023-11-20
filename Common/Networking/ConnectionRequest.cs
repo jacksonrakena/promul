@@ -3,6 +3,7 @@ using System.IO;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using Promul.Common.Networking.Packets.Internal;
 
 namespace Promul.Common.Networking
 {
@@ -19,7 +20,7 @@ namespace Promul.Common.Networking
     /// </summary>
     public class ConnectionRequest
     {
-        private readonly NetManager _listener;
+        private readonly PromulManager _listener;
         private int _used;
 
         /// <summary>
@@ -53,7 +54,7 @@ namespace Promul.Common.Networking
             return Interlocked.CompareExchange(ref _used, 1, 0) == 0;
         }
 
-        internal ConnectionRequest(IPEndPoint remoteEndPoint, NetConnectRequestPacket requestPacket, NetManager listener)
+        internal ConnectionRequest(IPEndPoint remoteEndPoint, NetConnectRequestPacket requestPacket, PromulManager listener)
         {
             InternalPacket = requestPacket;
             RemoteEndPoint = remoteEndPoint;
@@ -65,7 +66,7 @@ namespace Promul.Common.Networking
         /// </summary>
         /// <param name="key">The key to compare the data to.</param>
         /// <returns>Null, if the request was rejected. Otherwise, the connected peer.</returns>
-        public async Task<NetPeer?> AcceptIfMatchesKeyAsync(string key)
+        public async Task<PromulPeer?> AcceptIfMatchesKeyAsync(string key)
         {
             if (!TryActivate()) return null;
             try
@@ -89,7 +90,7 @@ namespace Promul.Common.Networking
         ///     Accepts the connection.
         /// </summary>
         /// <returns>The connected peer, or null, if the manager was unable to activate the peer.</returns>
-        public async Task<NetPeer?> AcceptAsync()
+        public async Task<PromulPeer?> AcceptAsync()
         {
             if (!TryActivate())
                 return null;

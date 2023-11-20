@@ -1,23 +1,24 @@
 ﻿using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Promul.Common.Networking.Packets;
 
-namespace Promul.Common.Networking
+namespace Promul.Common.Networking.Channels
 {
     internal abstract class ChannelBase
     {
-        protected readonly NetPeer Peer;
-        protected readonly Queue<NetPacket> OutgoingQueue = new(NetConstants.DefaultWindowSize);
+        protected readonly PromulPeer Peer;
+        protected readonly Queue<NetworkPacket> OutgoingQueue = new(NetConstants.DefaultWindowSize);
         private int _isAddedToPeerChannelSendQueue;
 
         public int PacketsInQueue => OutgoingQueue.Count;
 
-        protected ChannelBase(NetPeer peer)
+        protected ChannelBase(PromulPeer peer)
         {
             Peer = peer;
         }
 
-        public void EnqueuePacket(NetPacket packet)
+        public void EnqueuePacket(NetworkPacket packet)
         {
             lock (OutgoingQueue)
             {
@@ -57,6 +58,6 @@ namespace Promul.Common.Networking
         /// </summary>
         /// <param name="packet"></param>
         /// <returns></returns>
-        public abstract Task<bool> HandlePacketAsync(NetPacket packet);
+        public abstract Task<bool> HandlePacketAsync(NetworkPacket packet);
     }
 }

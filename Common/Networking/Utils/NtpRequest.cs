@@ -1,7 +1,7 @@
 ﻿using System.Net;
 using System.Net.Sockets;
 
-namespace Promul.Common.Networking.Utils
+namespace Promul.Common.Networking
 {
     internal sealed class NtpRequest
     {

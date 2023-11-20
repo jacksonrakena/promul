@@ -37,7 +37,7 @@ namespace Promul.Common.Networking
 
             if (!IPAddress.TryParse(hostStr, out var ipAddress))
             {
-                if (NetManager.IPv6Support)
+                if (PromulManager.IPv6Support)
                     ipAddress = ResolveAddress(hostStr, AddressFamily.InterNetworkV6);
                 if (ipAddress == null)
                     ipAddress = ResolveAddress(hostStr, AddressFamily.InterNetwork);
@@ -158,7 +158,7 @@ namespace Promul.Common.Networking
         // ===========================================
         internal static void PrintInterfaceInfos()
         {
-            NetDebug.WriteForce(NetLogLevel.Info, $"IPv6Support: { NetManager.IPv6Support}");
+            NetDebug.WriteForce(NetLogLevel.Info, $"IPv6Support: { PromulManager.IPv6Support}");
             try
             {
                 foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())

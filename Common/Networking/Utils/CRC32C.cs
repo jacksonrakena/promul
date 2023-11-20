@@ -7,7 +7,7 @@ using System.Runtime.Intrinsics.X86;
 using System.Runtime.Intrinsics.Arm;
 #endif
 
-namespace Promul.Common.Networking.Utils
+namespace Promul.Common.Networking
 {
     //Implementation from Crc32.NET
     public static class CRC32C

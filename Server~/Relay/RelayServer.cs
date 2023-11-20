@@ -2,13 +2,12 @@
 using Promul.Common.Networking.Data;
 using Promul.Common.Structs;
 using Promul.Server.Relay.Sessions;
-using NetManager = Promul.Common.Networking.NetManager;
 
 namespace Promul.Server.Relay;
 
 public class RelayServer
 {
-    public NetManager NetManager { get; }
+    public PromulManager PromulManager { get; }
 
     readonly Dictionary<string, RelaySession> _sessionsByCode = new Dictionary<string, RelaySession>();
     readonly Dictionary<int, RelaySession> _sessionsByPeer = new Dictionary<int, RelaySession>();
@@ -20,13 +19,13 @@ public class RelayServer
     {
         _logger = logger;
         _factory = factory;
-        NetManager = new NetManager();
+        PromulManager = new PromulManager();
 
 
-        NetManager.OnReceive += OnNetworkReceive;
-        NetManager.OnConnectionRequest += OnConnectionRequest;
-        NetManager.OnPeerConnected += OnPeerConnected;
-        NetManager.OnPeerDisconnected += OnPeerDisconnected;
+        PromulManager.OnReceive += OnNetworkReceive;
+        PromulManager.OnConnectionRequest += OnConnectionRequest;
+        PromulManager.OnPeerConnected += OnPeerConnected;
+        PromulManager.OnPeerDisconnected += OnPeerDisconnected;
     }
 
     public Dictionary<string, RelaySession> GetAllSessions() => _sessionsByCode;
@@ -52,7 +51,7 @@ public class RelayServer
         _sessionsByCode.Remove(session.JoinCode);
     }
 
-    public async Task OnNetworkReceive(NetPeer peer, BinaryReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
+    public async Task OnNetworkReceive(PromulPeer peer, BinaryReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
         var packet = reader.ReadRelayControlMessage();
 
@@ -60,7 +59,7 @@ public class RelayServer
         if (!_sessionsByPeer.TryGetValue(peer.Id, out var session))
         {
             _logger.LogInformation(format, peer.Id, peer.EndPoint, "because they are not attached to a session.");
-            await NetManager.DisconnectPeerAsync(peer);
+            await PromulManager.DisconnectPeerAsync(peer);
             return;
         }
 
@@ -84,11 +83,11 @@ public class RelayServer
         _sessionsByPeer[peer.Id] = keyedSession;
     }
     
-    public async Task OnPeerConnected(NetPeer peer)
+    public async Task OnPeerConnected(PromulPeer peer)
     {
         _logger.LogInformation($"Connected to {peer.EndPoint}");
     }
-    public async Task OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
+    public async Task OnPeerDisconnected(PromulPeer peer, DisconnectInfo disconnectInfo)
     {
         _logger.LogInformation($"Peer {peer.Id} disconnected: {disconnectInfo.Reason} {disconnectInfo.SocketErrorCode}");
         if (_sessionsByPeer.TryGetValue(peer.Id, out var session))

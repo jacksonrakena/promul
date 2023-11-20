@@ -1,7 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace Promul.Common.Networking.Utils
+namespace Promul.Common.Networking
 {
     public static class FastBitConverter
     {

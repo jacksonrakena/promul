@@ -1,8 +1,8 @@
 ﻿using System;
 using System.IO;
-using Promul.Common.Networking.Utils;
+using Promul.Common.Networking.Packets.Internal;
 
-namespace Promul.Common.Networking
+namespace Promul.Common.Networking.Packets
 {
     public enum PacketProperty : byte
     {
@@ -26,17 +26,17 @@ namespace Promul.Common.Networking
         Empty
     }
 
-    public class NetPacket
+    public class NetworkPacket
     {
         private static readonly int PropertiesCount = Enum.GetValues(typeof(PacketProperty)).Length;
         private static readonly int[] HeaderSizes;
 
-        public static implicit operator ArraySegment<byte>(NetPacket ndw)
+        public static implicit operator ArraySegment<byte>(NetworkPacket ndw)
         {
             return ndw.Data;
         }
 
-        static NetPacket()
+        static NetworkPacket()
         {
             HeaderSizes = NetUtils.AllocatePinnedUninitializedArray<int>(PropertiesCount);
             for (int i = 0; i < HeaderSizes.Length; i++)
@@ -122,25 +122,25 @@ namespace Promul.Common.Networking
         //Data
         public ArraySegment<byte> Data { get; }
 
-        private NetPacket(ArraySegment<byte> data, PacketProperty property = default)
+        private NetworkPacket(ArraySegment<byte> data, PacketProperty property = default)
         {
             Data = data;
             Property = property;
         }
 
-        public static NetPacket Empty(int size)
+        public static NetworkPacket Empty(int size)
         {
-            return new NetPacket(new byte[size]);
+            return new NetworkPacket(new byte[size]);
         }
 
-        public static NetPacket FromBuffer(ArraySegment<byte> data)
+        public static NetworkPacket FromBuffer(ArraySegment<byte> data)
         {
-            return new NetPacket(data);
+            return new NetworkPacket(data);
         }
 
-        public static NetPacket FromProperty(PacketProperty property, int size)
+        public static NetworkPacket FromProperty(PacketProperty property, int size)
         {
-            return new NetPacket(new byte[size+GetHeaderSize(property)], property);
+            return new NetworkPacket(new byte[size+GetHeaderSize(property)], property);
         }
 
         public static int GetHeaderSize(PacketProperty property)

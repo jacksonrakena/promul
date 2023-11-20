@@ -5,10 +5,11 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Promul.Common.Networking.Data;
+using Promul.Common.Networking.Packets;
 
 namespace Promul.Common.Networking
 {
-    public partial class NetManager
+    public partial class PromulManager
     {
         private Socket? _udpSocketv4;
         private Socket? _udpSocketv6;
@@ -44,7 +45,7 @@ namespace Promul.Common.Networking
             }
         }
 
-        static NetManager()
+        static PromulManager()
         {
 #if DISABLE_IPV6
             IPv6Support = false;
@@ -85,7 +86,7 @@ namespace Promul.Common.Networking
         {
             var receivebuf = new byte[NetConstants.MaxPacketSize];
             var receive = await s.ReceiveFromAsync(receivebuf, SocketFlags.None, bufferEndPoint);
-            var packet = NetPacket.FromBuffer(new ArraySegment<byte>(receivebuf, 0, receive.ReceivedBytes));
+            var packet = NetworkPacket.FromBuffer(new ArraySegment<byte>(receivebuf, 0, receive.ReceivedBytes));
             await OnMessageReceived(packet, (IPEndPoint) receive.RemoteEndPoint);
         }
 
@@ -286,19 +287,13 @@ namespace Promul.Common.Networking
             }
             return true;
         }
- 
-        internal async Task<int> SendRawAndRecycle(NetPacket packet, IPEndPoint remoteEndPoint, CancellationToken ct = default)
-        {
-            int result = await SendRaw(packet, remoteEndPoint, ct);
-            return result;
-        }
         
         internal async Task<int> SendRaw(ArraySegment<byte> data, IPEndPoint remoteEndPoint, CancellationToken ct = default)
         {
-            NetPacket? expandedPacket = null;
+            NetworkPacket? expandedPacket = null;
             if (_extraPacketLayer != null)
             {
-                expandedPacket = NetPacket.Empty(data.Count + _extraPacketLayer.ExtraPacketSizeForLayer);
+                expandedPacket = NetworkPacket.Empty(data.Count + _extraPacketLayer.ExtraPacketSizeForLayer);
                 
                 data.CopyTo(expandedPacket.Data.Array, expandedPacket.Data.Offset);
 
@@ -383,11 +378,11 @@ namespace Promul.Common.Networking
 
         public async Task<bool> SendBroadcast(ArraySegment<byte> data, int port)
         {
-            NetPacket packet;
+            NetworkPacket packet;
             if (_extraPacketLayer != null)
             {
-                var headerSize = NetPacket.GetHeaderSize(PacketProperty.Broadcast);
-                packet = NetPacket.Empty(headerSize + data.Count + _extraPacketLayer.ExtraPacketSizeForLayer);
+                var headerSize = NetworkPacket.GetHeaderSize(PacketProperty.Broadcast);
+                packet = NetworkPacket.Empty(headerSize + data.Count + _extraPacketLayer.ExtraPacketSizeForLayer);
                 
                 packet.Property = PacketProperty.Broadcast;
                 data.CopyTo(packet.Data.Array, packet.Data.Offset+headerSize);
@@ -399,7 +394,7 @@ namespace Promul.Common.Networking
             }
             else
             {
-                packet = NetPacket.FromBuffer(data);
+                packet = NetworkPacket.FromBuffer(data);
                 packet.Property = PacketProperty.Broadcast;
             }
 

@@ -4,9 +4,9 @@ namespace Promul.Server.Relay.Sessions;
 
 public class RelaySession
 {
-    readonly Dictionary<int, NetPeer> _connections = new Dictionary<int, NetPeer>();
+    readonly Dictionary<int, PromulPeer> _connections = new Dictionary<int, PromulPeer>();
     int? host = null;
-    public NetPeer? HostPeer => host != null ? _connections[host.Value] : null;
+    public PromulPeer? HostPeer => host != null ? _connections[host.Value] : null;
     public string JoinCode { get; }
 
     readonly ILogger<RelaySession> _logger;
@@ -19,9 +19,9 @@ public class RelaySession
         _server = server;
     }
 
-    public IEnumerable<NetPeer> Peers => _connections.Values;
+    public IEnumerable<PromulPeer> Peers => _connections.Values;
 
-    public async Task OnReceive(NetPeer from, RelayControlMessage message, DeliveryMethod method)
+    public async Task OnReceive(PromulPeer from, RelayControlMessage message, DeliveryMethod method)
     {
         if (!_connections.TryGetValue((int) message.AuthorClientId, out var dest))
         {
@@ -42,7 +42,7 @@ public class RelaySession
                     if (_connections.TryGetValue((int)target, out var targetPeer))
                     {
                         _connections.Remove((int)target);
-                        await _server.NetManager.DisconnectPeerAsync(targetPeer);
+                        await _server.PromulManager.DisconnectPeerAsync(targetPeer);
                         LogInformation($"Host {from.Id} successfully kicked {target}");
                     }
                 }
@@ -57,7 +57,7 @@ public class RelaySession
 
     }
 
-    private void Send(NetPeer to, RelayControlMessage message, DeliveryMethod method)
+    private void Send(PromulPeer to, RelayControlMessage message, DeliveryMethod method)
     {
         var writer = new BinaryWriter(new MemoryStream());
         writer.Write(message);
@@ -65,7 +65,7 @@ public class RelaySession
         to.Send(writer, deliveryMethod: method);
     }
 
-    public void OnJoin(NetPeer peer)
+    public void OnJoin(PromulPeer peer)
     {
         _connections[peer.Id] = peer;
         if (host == null)
@@ -93,7 +93,7 @@ public class RelaySession
         }
     }
 
-    public async Task OnLeave(NetPeer peer)
+    public async Task OnLeave(PromulPeer peer)
     {
         LogInformation($"{peer.Id} has left");
         if (_connections.ContainsKey(peer.Id))
@@ -122,7 +122,7 @@ public class RelaySession
     {
         foreach (var con in _connections.Values)
         {
-            await this._server.NetManager.DisconnectPeerAsync(con);
+            await this._server.PromulManager.DisconnectPeerAsync(con);
         }
         _connections.Clear();
     }

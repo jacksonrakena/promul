@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Promul.Common.Networking;
 using Promul.Common.Networking.Data;
 using Promul.Common.Structs;
-using NetManager = Promul.Common.Networking.NetManager;
 
 namespace Promul.Runtime
 {
@@ -41,7 +40,7 @@ namespace Promul.Runtime
         [Tooltip("Simulated maximum additional latency for packets in milliseconds (0 for no simulation")]
         public int SimulateMaxLatency = 0;
 
-        NetManager m_NetManager;
+        PromulManager _mPromulManager;
 
         public override ulong ServerClientId => 0;
         HostType m_HostType;
@@ -62,7 +61,7 @@ namespace Promul.Runtime
         
         public override bool IsSupported => Application.platform != RuntimePlatform.WebGLPlayer;
 
-        NetPeer? _relayPeer;
+        PromulPeer? _relayPeer;
         CancellationTokenSource _cts = new CancellationTokenSource();
 
         public void SendControl(RelayControlMessage rcm, NetworkDelivery qos)
@@ -82,7 +81,7 @@ namespace Promul.Runtime
             }, qos);
         }
 
-        async Task OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod)
+        async Task OnNetworkReceive(PromulPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod)
         {
             var message = reader.ReadRelayControlMessage();
             var author = message.AuthorClientId;
@@ -136,11 +135,11 @@ namespace Promul.Runtime
         {
             _ = Task.Run(async () =>
             {
-                m_NetManager.Bind(IPAddress.Any, IPAddress.None, 0);
+                _mPromulManager.Bind(IPAddress.Any, IPAddress.None, 0);
                 var joinPacket = new NetDataWriter();
                 joinPacket.Put(joinCode);
-                _relayPeer = await m_NetManager.ConnectAsync(NetUtils.MakeEndPoint(Address, Port), joinPacket);
-                await m_NetManager.ListenAsync(_cts.Token);
+                _relayPeer = await _mPromulManager.ConnectAsync(NetUtils.MakeEndPoint(Address, Port), joinPacket);
+                await _mPromulManager.ListenAsync(_cts.Token);
             }, _cts.Token);
             return true;
         }
@@ -164,7 +163,7 @@ namespace Promul.Runtime
 
         public override void DisconnectLocalClient()
         {
-            _ = Task.Run(() => m_NetManager.DisconnectAllPeersAsync());
+            _ = Task.Run(() => _mPromulManager.DisconnectAllPeersAsync());
             _relayPeer = null;
         }
 
@@ -177,10 +176,10 @@ namespace Promul.Runtime
         public override void Shutdown()
         {
             Debug.Log("Shutdown");
-            m_NetManager.OnConnectionRequest -= OnConnectionRequest;
-            m_NetManager.OnPeerDisconnected -= OnPeerDisconnected;
-            m_NetManager.OnReceive -= OnNetworkReceive;
-            _ = m_NetManager.StopAsync();
+            _mPromulManager.OnConnectionRequest -= OnConnectionRequest;
+            _mPromulManager.OnPeerDisconnected -= OnPeerDisconnected;
+            _mPromulManager.OnReceive -= OnNetworkReceive;
+            _ = _mPromulManager.StopAsync();
             
             _cts.Cancel();
             _relayPeer = null;
@@ -189,7 +188,7 @@ namespace Promul.Runtime
 
         public override void Initialize(NetworkManager networkManager = null)
         {
-            m_NetManager = new NetManager
+            _mPromulManager = new PromulManager
             {
                 PingInterval = SecondsToMilliseconds(PingInterval),
                 DisconnectTimeout = SecondsToMilliseconds(DisconnectTimeout),
@@ -203,9 +202,9 @@ namespace Promul.Runtime
                 Ipv6Enabled = false
             };
 
-            m_NetManager.OnConnectionRequest += OnConnectionRequest;
-            m_NetManager.OnPeerDisconnected += OnPeerDisconnected;
-            m_NetManager.OnReceive += OnNetworkReceive;
+            _mPromulManager.OnConnectionRequest += OnConnectionRequest;
+            _mPromulManager.OnPeerDisconnected += OnPeerDisconnected;
+            _mPromulManager.OnReceive += OnNetworkReceive;
         }
 
         static DeliveryMethod ConvertNetworkDelivery(NetworkDelivery type)
@@ -224,7 +223,7 @@ namespace Promul.Runtime
         {
             await request.RejectAsync(force: true);
         }
-        async Task OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
+        async Task OnPeerDisconnected(PromulPeer peer, DisconnectInfo disconnectInfo)
         {
             Debug.Log("Disconnected " + disconnectInfo.Reason.ToString() + " " + disconnectInfo.SocketErrorCode.ToString());
             if (disconnectInfo.Reason != DisconnectReason.DisconnectPeerCalled) 

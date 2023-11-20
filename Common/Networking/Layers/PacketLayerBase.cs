@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using Promul.Common.Networking.Packets;
 
 namespace Promul.Common.Networking.Layers
 {
@@ -12,8 +13,8 @@ namespace Promul.Common.Networking.Layers
         }
 
         public abstract void ProcessInboundPacket(ref IPEndPoint endPoint, 
-            ref NetPacket data);
+            ref NetworkPacket data);
         public abstract void ProcessOutBoundPacket(ref IPEndPoint endPoint, 
-            ref NetPacket data);
+            ref NetworkPacket data);
     }
 }

@@ -6,11 +6,11 @@ using System.Threading.Tasks;
 
 namespace Promul.Common.Networking
 {
-    public partial class NetManager
+    public partial class PromulManager
     {
         private async Task PeerUpdateLoopBlockingAsync(CancellationToken ct = default)
         {
-            var peersToRemove = new List<NetPeer>();
+            var peersToRemove = new List<PromulPeer>();
             var startTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
             while (!ct.IsCancellationRequested)
@@ -21,7 +21,7 @@ namespace Promul.Common.Networking
                     var deltaTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - startTime;
                     startTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-                    async Task tick(NetPeer e)
+                    async Task tick(PromulPeer e)
                     {
                         if (e.ConnectionState == ConnectionState.Disconnected &&
                             e.TimeSinceLastPacket > DisconnectTimeout)

@@ -9,8 +9,10 @@ using System.IO;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using Promul.Common.Networking.Channels;
 using Promul.Common.Networking.Data;
-using Promul.Common.Networking.Utils;
+using Promul.Common.Networking.Packets;
+using Promul.Common.Networking.Packets.Internal;
 
 namespace Promul.Common.Networking
 {
@@ -74,9 +76,9 @@ namespace Promul.Common.Networking
     }
 
     /// <summary>
-    ///     Represents a remote peer, managed by a given <see cref="NetManager"/> instance.
+    ///     Represents a remote peer, managed by a given <see cref="PromulManager"/> instance.
     /// </summary>
-    public class NetPeer
+    public class PromulPeer
     {
         //Ping and RTT
         private int _rtt;
@@ -88,8 +90,8 @@ namespace Promul.Common.Networking
 
         //Common
         readonly SemaphoreSlim _shutdownSemaphore = new SemaphoreSlim(1, 1);
-        internal volatile NetPeer? NextPeer;
-        internal NetPeer? PrevPeer;
+        internal volatile PromulPeer? NextPeer;
+        internal PromulPeer? PrevPeer;
 
         internal byte ConnectionNum
         {
@@ -104,7 +106,7 @@ namespace Promul.Common.Networking
         }
 
         //Channels
-        private readonly Queue<NetPacket> _unreliableChannel;
+        private readonly Queue<NetworkPacket> _unreliableChannel;
         SemaphoreSlim _unreliableChannelSemaphore = new SemaphoreSlim(1, 1);
         private readonly ConcurrentQueue<ChannelBase> _channelSendQueue;
         private readonly ChannelBase?[] _channels;
@@ -121,7 +123,7 @@ namespace Promul.Common.Networking
         //Fragment
         private class IncomingFragments
         {
-            public NetPacket[] Fragments;
+            public NetworkPacket[] Fragments;
             public int ReceivedCount;
             public int TotalSize;
             public byte ChannelId;
@@ -131,7 +133,7 @@ namespace Promul.Common.Networking
         private readonly Dictionary<ushort, ushort> _deliveredFragments;
 
         //Merging
-        private readonly NetPacket _mergeData;
+        private readonly NetworkPacket _mergeData;
         private int _mergePos;
         private int _mergeCount;
 
@@ -139,13 +141,13 @@ namespace Promul.Common.Networking
         private int _connectAttempts;
         private long _connectTimer;
         private byte _connectNum;
-        private NetPacket? _shutdownPacket;
+        private NetworkPacket? _shutdownPacket;
         private const int ShutdownDelay = 300;
         private long _shutdownTimer;
-        private readonly NetPacket _pingPacket;
-        private readonly NetPacket _pongPacket;
-        private NetPacket? _connectRequestPacket;
-        private NetPacket? _connectAcceptPacket;
+        private readonly NetworkPacket _pingPacket;
+        private readonly NetworkPacket _pongPacket;
+        private NetworkPacket? _connectRequestPacket;
+        private NetworkPacket? _connectAcceptPacket;
 
         /// <summary>
         ///     The remote endpoint of this peer.
@@ -153,9 +155,9 @@ namespace Promul.Common.Networking
         public IPEndPoint EndPoint { get; private set; }
 
         /// <summary>
-        ///     The <see cref="NetManager"/> instance responsible for this peer.
+        ///     The <see cref="PromulManager"/> instance responsible for this peer.
         /// </summary>
-        public readonly NetManager NetManager;
+        public readonly PromulManager PromulManager;
 
         /// <summary>
         ///     The current connection state of this peer.
@@ -195,7 +197,7 @@ namespace Promul.Common.Networking
         public int MaximumTransferUnit { get; private set; }
 
         /// <summary>
-        ///     The current delta between the remote peer's time and the <see cref="NetManager"/>'s local time.
+        ///     The current delta between the remote peer's time and the <see cref="PromulManager"/>'s local time.
         ///     A positive value indicates the remote peer is ahead of local time.
         /// </summary>
         public long RemoteTimeDelta { get; private set; }
@@ -217,23 +219,23 @@ namespace Promul.Common.Networking
         /// </summary>
         public readonly NetStatistics Statistics = new NetStatistics();
 
-        internal NetPeer(NetManager netManager, IPEndPoint remoteEndPoint, int id)
+        internal PromulPeer(PromulManager promulManager, IPEndPoint remoteEndPoint, int id)
         {
             Id = id;
-            NetManager = netManager;
+            PromulManager = promulManager;
             ResetMtu();
             EndPoint = remoteEndPoint;
             ConnectionState = ConnectionState.Connected;
-            _mergeData = NetPacket.FromProperty(PacketProperty.Merged, NetConstants.MaxPacketSize);
-            _pongPacket = NetPacket.FromProperty(PacketProperty.Pong, 0);
-            _pingPacket = NetPacket.FromProperty(PacketProperty.Ping, 0);
+            _mergeData = NetworkPacket.FromProperty(PacketProperty.Merged, NetConstants.MaxPacketSize);
+            _pongPacket = NetworkPacket.FromProperty(PacketProperty.Pong, 0);
+            _pingPacket = NetworkPacket.FromProperty(PacketProperty.Ping, 0);
             _pingPacket.Sequence = 1;
 
-            _unreliableChannel = new Queue<NetPacket>();
+            _unreliableChannel = new Queue<NetworkPacket>();
             _holdedFragments = new Dictionary<ushort, IncomingFragments>();
             _deliveredFragments = new Dictionary<ushort, ushort>();
 
-            _channels = new ChannelBase[netManager.ChannelsCount * NetConstants.ChannelTypeCount];
+            _channels = new ChannelBase[promulManager.ChannelsCount * NetConstants.ChannelTypeCount];
             _channelSendQueue = new ConcurrentQueue<ChannelBase>();
         }
 
@@ -254,9 +256,9 @@ namespace Promul.Common.Networking
         internal void ResetMtu()
         {
             _finishMtu = false;
-            if (NetManager.MtuOverride > 0)
-                OverrideMtu(NetManager.MtuOverride);
-            else if (NetManager.UseSafeMtu)
+            if (PromulManager.MtuOverride > 0)
+                OverrideMtu(PromulManager.MtuOverride);
+            else if (PromulManager.UseSafeMtu)
                 SetMtu(0);
             else
                 SetMtu(1);
@@ -265,7 +267,7 @@ namespace Promul.Common.Networking
         private void SetMtu(int mtuIdx)
         {
             _mtuIdx = mtuIdx;
-            MaximumTransferUnit = NetConstants.PossibleMtu[mtuIdx] - NetManager.ExtraPacketSizeForLayer;
+            MaximumTransferUnit = NetConstants.PossibleMtu[mtuIdx] - PromulManager.ExtraPacketSizeForLayer;
         }
 
         private void OverrideMtu(int mtuValue)
@@ -315,12 +317,12 @@ namespace Promul.Common.Networking
             return newChannel;
         }
 
-        internal static async Task<NetPeer> ConnectToAsync(NetManager manager, IPEndPoint remote, int id, byte connectionNumber, ArraySegment<byte> data)
+        internal static async Task<PromulPeer> ConnectToAsync(PromulManager manager, IPEndPoint remote, int id, byte connectionNumber, ArraySegment<byte> data)
         {
             var time = DateTime.UtcNow.Ticks;
             var packet = NetConnectRequestPacket.Make(data, remote.Serialize(), time, id);
             packet.ConnectionNumber = connectionNumber;
-            var peer = new NetPeer(manager, remote, id, time, connectionNumber)
+            var peer = new PromulPeer(manager, remote, id, time, connectionNumber)
             {
                 ConnectionState = ConnectionState.Outgoing,
                 _connectRequestPacket = packet
@@ -332,39 +334,39 @@ namespace Promul.Common.Networking
             return peer;
         }
         
-        internal static async Task<NetPeer> AcceptAsync(NetManager netManager, ConnectionRequest request, int id)
+        internal static async Task<PromulPeer> AcceptAsync(PromulManager promulManager, ConnectionRequest request, int id)
         {
-            var peer = new NetPeer(netManager, request.RemoteEndPoint, id, request.InternalPacket.ConnectionTime, request.InternalPacket.ConnectionNumber)
+            var peer = new PromulPeer(promulManager, request.RemoteEndPoint, id, request.InternalPacket.ConnectionTime, request.InternalPacket.ConnectionNumber)
             {
                 RemoteId = request.InternalPacket.PeerId,
                 _connectAcceptPacket = NetConnectAcceptPacket.Make(request.InternalPacket.ConnectionTime, request.InternalPacket.ConnectionNumber, id),
                 ConnectionState = ConnectionState.Connected
             };
-            await netManager.SendRaw(peer._connectAcceptPacket, peer.EndPoint);
+            await promulManager.SendRaw(peer._connectAcceptPacket, peer.EndPoint);
 
             NetDebug.Write(NetLogLevel.Trace, $"[CC] ConnectId: {peer.ConnectTime}");
             return peer;
         }
 
-        private NetPeer(NetManager netManager, IPEndPoint remote, int id,
+        private PromulPeer(PromulManager promulManager, IPEndPoint remote, int id,
             long connectTime, byte connectionNumber)
         {
             Id = id;
             Statistics = new NetStatistics();
-            NetManager = netManager;
+            PromulManager = promulManager;
             ResetMtu();
             EndPoint = remote;
             ConnectionState = ConnectionState.Connected;
-            _mergeData = NetPacket.FromProperty(PacketProperty.Merged, NetConstants.MaxPacketSize);
-            _pongPacket = NetPacket.FromProperty(PacketProperty.Pong, 0);
-            _pingPacket = NetPacket.FromProperty(PacketProperty.Ping, 0);
+            _mergeData = NetworkPacket.FromProperty(PacketProperty.Merged, NetConstants.MaxPacketSize);
+            _pongPacket = NetworkPacket.FromProperty(PacketProperty.Pong, 0);
+            _pingPacket = NetworkPacket.FromProperty(PacketProperty.Ping, 0);
             _pingPacket.Sequence = 1;
 
-            _unreliableChannel = new Queue<NetPacket>();
+            _unreliableChannel = new Queue<NetworkPacket>();
             _holdedFragments = new Dictionary<ushort, IncomingFragments>();
             _deliveredFragments = new Dictionary<ushort, ushort>();
 
-            _channels = new ChannelBase[netManager.ChannelsCount * NetConstants.ChannelTypeCount];
+            _channels = new ChannelBase[promulManager.ChannelsCount * NetConstants.ChannelTypeCount];
             _channelSendQueue = new ConcurrentQueue<ChannelBase>();
 
             ConnectTime = connectTime;
@@ -408,7 +410,7 @@ namespace Promul.Common.Networking
         /// <returns>The maximum transmission unit size, in bytes, for the queried packet type.</returns>
         public int GetUserMaximumTransmissionUnit(DeliveryMethod options)
         {
-            return MaximumTransferUnit - NetPacket.GetHeaderSize(options == DeliveryMethod.Unreliable ? PacketProperty.Unreliable : PacketProperty.Channeled);
+            return MaximumTransferUnit - NetworkPacket.GetHeaderSize(options == DeliveryMethod.Unreliable ? PacketProperty.Unreliable : PacketProperty.Channeled);
         }
 
         /// <summary>
@@ -475,7 +477,7 @@ namespace Promul.Common.Networking
             NetDebug.Write("[RS]Packet: " + property);
 
             //Check fragmentation
-            int headerSize = NetPacket.GetHeaderSize(property);
+            int headerSize = NetworkPacket.GetHeaderSize(property);
             //Save mtu for multithread
             int mtu = MaximumTransferUnit;
             if (data.Count + headerSize > mtu)
@@ -504,7 +506,7 @@ namespace Promul.Common.Networking
                 {
                     int sendLength = data.Count > packetDataSize ? packetDataSize : data.Count;
 
-                    NetPacket p = NetPacket.Empty(headerSize + sendLength + NetConstants.FragmentHeaderSize);
+                    NetworkPacket p = NetworkPacket.Empty(headerSize + sendLength + NetConstants.FragmentHeaderSize);
                     p.Property = property;
                     p.FragmentId = currentFragmentId;
                     p.FragmentPart = partIdx;
@@ -520,7 +522,7 @@ namespace Promul.Common.Networking
             }
 
             //Else just send
-            NetPacket packet = NetPacket.Empty(headerSize + length);
+            NetworkPacket packet = NetworkPacket.Empty(headerSize + length);
             packet.Property = property;
             if (data.Array != null) Buffer.BlockCopy(data.Array, data.Offset, 
                 packet.Data.Array, packet.Data.Offset+headerSize, length);
@@ -537,7 +539,7 @@ namespace Promul.Common.Networking
             }
         }
 
-        internal DisconnectResult ProcessDisconnect(NetPacket packet)
+        internal DisconnectResult ProcessDisconnect(NetworkPacket packet)
         {
             if ((ConnectionState == ConnectionState.Connected || ConnectionState == ConnectionState.Outgoing) &&
                 packet.Data.Count >= 9 &&
@@ -582,7 +584,7 @@ namespace Promul.Common.Networking
                 Interlocked.Exchange(ref _timeSinceLastPacket, 0);
 
                 //send shutdown packet
-                _shutdownPacket = NetPacket.FromProperty(PacketProperty.Disconnect, data.Count);
+                _shutdownPacket = NetworkPacket.FromProperty(PacketProperty.Disconnect, data.Count);
                 _shutdownPacket.ConnectionNumber = _connectNum;
                 FastBitConverter.GetBytes(_shutdownPacket.Data.Array, _shutdownPacket.Data.Offset+1, ConnectTime);
                 if (_shutdownPacket.Data.Count >= MaximumTransferUnit)
@@ -596,7 +598,7 @@ namespace Promul.Common.Networking
                 }
                 ConnectionState = ConnectionState.ShutdownRequested;
                 NetDebug.Write("[Peer] Send disconnect");
-                await NetManager.SendRaw(_shutdownPacket, EndPoint);
+                await PromulManager.SendRaw(_shutdownPacket, EndPoint);
                 return result;
             }
             finally { _shutdownSemaphore.Release();  }
@@ -610,7 +612,7 @@ namespace Promul.Common.Networking
             ResendDelay = 25.0 + RoundTripTime * 2.1; // 25 ms + double rtt
         }
 
-        internal async Task AddReliablePacket(DeliveryMethod method, NetPacket p)
+        internal async Task AddReliablePacket(DeliveryMethod method, NetworkPacket p)
         {
             if (p.IsFragmented)
             {
@@ -622,7 +624,7 @@ namespace Promul.Common.Networking
                 {
                     incomingFragments = new IncomingFragments
                     {
-                        Fragments = new NetPacket[p.FragmentsTotal],
+                        Fragments = new NetworkPacket[p.FragmentsTotal],
                         ChannelId = p.ChannelId
                     };
                     _holdedFragments.Add(packetFragId, incomingFragments);
@@ -654,7 +656,7 @@ namespace Promul.Common.Networking
                     return;
 
                 //just simple packet
-                NetPacket resultingPacket = NetPacket.Empty(incomingFragments.TotalSize);
+                NetworkPacket resultingPacket = NetworkPacket.Empty(incomingFragments.TotalSize);
 
                 int pos = 0;
                 for (int i = 0; i < incomingFragments.ReceivedCount; i++)
@@ -693,15 +695,15 @@ namespace Promul.Common.Networking
                 _holdedFragments.Remove(packetFragId);
 
                 //Send to process
-                await NetManager.CreateReceiveEvent(resultingPacket, method, (byte)(packetChannelId / NetConstants.ChannelTypeCount), 0, this);
+                await PromulManager.CreateReceiveEvent(resultingPacket, method, (byte)(packetChannelId / NetConstants.ChannelTypeCount), 0, this);
             }
             else //Just simple packet
             {
-                await NetManager.CreateReceiveEvent(p, method, (byte)(p.ChannelId / NetConstants.ChannelTypeCount), NetConstants.ChanneledHeaderSize, this);
+                await PromulManager.CreateReceiveEvent(p, method, (byte)(p.ChannelId / NetConstants.ChannelTypeCount), NetConstants.ChanneledHeaderSize, this);
             }
         }
 
-        private async Task ProcessMtuPacket(NetPacket packet)
+        private async Task ProcessMtuPacket(NetworkPacket packet)
         {
             //header + int
             if (packet.Data.Count < NetConstants.PossibleMtu[0])
@@ -721,12 +723,12 @@ namespace Promul.Common.Networking
                 _mtuCheckAttempts = 0;
                 NetDebug.Write("[MTU] check. send back: " + receivedMtu);
                 packet.Property = PacketProperty.MtuOk;
-                await NetManager.SendRawAndRecycle(packet, EndPoint);
+                await PromulManager.SendRaw(packet, EndPoint);
             }
             else if(receivedMtu > MaximumTransferUnit && !_finishMtu) //MtuOk
             {
                 //invalid packet
-                if (receivedMtu != NetConstants.PossibleMtu[_mtuIdx + 1] - NetManager.ExtraPacketSizeForLayer)
+                if (receivedMtu != NetConstants.PossibleMtu[_mtuIdx + 1] - PromulManager.ExtraPacketSizeForLayer)
                     return;
 
                 await _mtuMutex.WaitAsync();
@@ -768,14 +770,14 @@ namespace Promul.Common.Networking
                     return;
 
                 //Send increased packet
-                int newMtu = NetConstants.PossibleMtu[_mtuIdx + 1] - NetManager.ExtraPacketSizeForLayer;
-                var p = NetPacket.Empty(newMtu);// NetManager.PoolGetPacket(newMtu);
+                int newMtu = NetConstants.PossibleMtu[_mtuIdx + 1] - PromulManager.ExtraPacketSizeForLayer;
+                var p = NetworkPacket.Empty(newMtu);// NetManager.PoolGetPacket(newMtu);
                 p.Property = PacketProperty.MtuCheck;
                 FastBitConverter.GetBytes(p.Data.Array, p.Data.Offset+1, newMtu);          //place into start
                 FastBitConverter.GetBytes(p.Data.Array, p.Data.Offset+p.Data.Count - 4, newMtu); //and end of packet
 
                 //Must check result for MTU fix
-                if (await NetManager.SendRawAndRecycle(p, EndPoint) <= 0)
+                if (await PromulManager.SendRaw(p, EndPoint) <= 0)
                     _finishMtu = true;
             }
             finally
@@ -817,7 +819,7 @@ namespace Promul.Common.Networking
                     if (connRequest.ConnectionTime == ConnectTime)
                     {
                         //just reply accept
-                        await NetManager.SendRaw(_connectAcceptPacket, EndPoint);
+                        await PromulManager.SendRaw(_connectAcceptPacket, EndPoint);
                     }
                     //New connect request
                     else if (connRequest.ConnectionTime > ConnectTime)
@@ -836,7 +838,7 @@ namespace Promul.Common.Networking
         }
 
         //Process incoming packet
-        internal async Task ProcessPacket(NetPacket packet)
+        internal async Task ProcessPacket(NetworkPacket packet)
         {
             //not initialized
             if (ConnectionState == ConnectionState.Outgoing || ConnectionState == ConnectionState.Disconnected)
@@ -871,7 +873,7 @@ namespace Promul.Common.Networking
                         if (packet.Data.Count - pos < size)
                             break;
 
-                        NetPacket mergedPacket = NetPacket.Empty(size);
+                        NetworkPacket mergedPacket = NetworkPacket.Empty(size);
                         Buffer.BlockCopy(packet.Data.Array, packet.Data.Offset+pos, mergedPacket.Data.Array, mergedPacket.Data.Offset, size);
 
                         if (!mergedPacket.Verify())
@@ -889,7 +891,7 @@ namespace Promul.Common.Networking
                         NetDebug.Write("[PP]Ping receive, send pong");
                         FastBitConverter.GetBytes(_pongPacket.Data.Array, _pongPacket.Data.Offset+3, DateTime.UtcNow.Ticks);
                         _pongPacket.Sequence = packet.Sequence;
-                        await NetManager.SendRaw(_pongPacket, EndPoint);
+                        await PromulManager.SendRaw(_pongPacket, EndPoint);
                     }
                     //NetManager.PoolRecycle(packet);
                     break;
@@ -902,7 +904,7 @@ namespace Promul.Common.Networking
                         int elapsedMs = (int)_pingTimer.ElapsedMilliseconds;
                         RemoteTimeDelta = BitConverter.ToInt64(packet.Data[3..]) + (elapsedMs * TimeSpan.TicksPerMillisecond ) / 2 - DateTime.UtcNow.Ticks;
                         UpdateRoundTripTime(elapsedMs);
-                        await NetManager.ConnectionLatencyUpdated(this, elapsedMs / 2);
+                        await PromulManager.ConnectionLatencyUpdated(this, elapsedMs / 2);
                         NetDebug.Write($"[PP]Ping: {packet.Sequence} - {elapsedMs} - {RemoteTimeDelta}");
                     }
                    // NetManager.PoolRecycle(packet);
@@ -925,7 +927,7 @@ namespace Promul.Common.Networking
 
                 //Simple packet without acks
                 case PacketProperty.Unreliable:
-                    await NetManager.CreateReceiveEvent(packet, DeliveryMethod.Unreliable, 0, NetConstants.HeaderSize, this);
+                    await PromulManager.CreateReceiveEvent(packet, DeliveryMethod.Unreliable, 0, NetConstants.HeaderSize, this);
                     return;
 
                 case PacketProperty.MtuCheck:
@@ -947,20 +949,20 @@ namespace Promul.Common.Networking
             if (_mergeCount > 1)
             {
                 NetDebug.Write("[P]Send merged: " + _mergePos + ", count: " + _mergeCount);
-                bytesSent = await NetManager.SendRaw(new ArraySegment<byte>(_mergeData.Data.Array, _mergeData.Data.Offset, NetConstants.HeaderSize + _mergePos),
+                bytesSent = await PromulManager.SendRaw(new ArraySegment<byte>(_mergeData.Data.Array, _mergeData.Data.Offset, NetConstants.HeaderSize + _mergePos),
                     EndPoint); 
                 //_mergeData.RawData, 0, NetConstants.HeaderSize + _mergePos, _remoteEndPoint);
             }
             else
             {
                 //Send without length information and merging
-                bytesSent = await NetManager.SendRaw(new ArraySegment<byte>(_mergeData.Data.Array, _mergeData.Data.Offset+NetConstants.HeaderSize + 2, _mergePos - 2),
+                bytesSent = await PromulManager.SendRaw(new ArraySegment<byte>(_mergeData.Data.Array, _mergeData.Data.Offset+NetConstants.HeaderSize + 2, _mergePos - 2),
                     EndPoint);
                 
                 //_mergeData.RawData, NetConstants.HeaderSize + 2, _mergePos - 2, _remoteEndPoint);
             }
 
-            if (NetManager.RecordNetworkStatistics)
+            if (PromulManager.RecordNetworkStatistics)
             {
                 Statistics.IncrementPacketsSent();
                 Statistics.AddBytesSent(bytesSent);
@@ -970,7 +972,7 @@ namespace Promul.Common.Networking
             _mergeCount = 0;
         }
 
-        internal async Task SendUserData(NetPacket packet)
+        internal async Task SendUserData(NetworkPacket packet)
         {
             packet.ConnectionNumber = _connectNum;
             int mergedPacketSize = NetConstants.HeaderSize + packet.Data.Count + 2;
@@ -978,9 +980,9 @@ namespace Promul.Common.Networking
             if (mergedPacketSize + sizeTreshold >= MaximumTransferUnit)
             {
                 NetDebug.Write(NetLogLevel.Trace, "[P]SendingPacket: " + packet.Property);
-                int bytesSent = await NetManager.SendRaw(packet, EndPoint);
+                int bytesSent = await PromulManager.SendRaw(packet, EndPoint);
 
-                if (NetManager.RecordNetworkStatistics)
+                if (PromulManager.RecordNetworkStatistics)
                 {
                     Statistics.IncrementPacketsSent();
                     Statistics.AddBytesSent(bytesSent);
@@ -1005,16 +1007,16 @@ namespace Promul.Common.Networking
             switch (ConnectionState)
             {
                 case ConnectionState.Connected:
-                    if (_timeSinceLastPacket > NetManager.DisconnectTimeout)
+                    if (_timeSinceLastPacket > PromulManager.DisconnectTimeout)
                     {
-                        NetDebug.Write($"[UPDATE] Disconnect by timeout: {_timeSinceLastPacket} > {NetManager.DisconnectTimeout}");
-                        await NetManager.ForceDisconnectPeerAsync(this, DisconnectReason.Timeout, 0, null);
+                        NetDebug.Write($"[UPDATE] Disconnect by timeout: {_timeSinceLastPacket} > {PromulManager.DisconnectTimeout}");
+                        await PromulManager.ForceDisconnectPeerAsync(this, DisconnectReason.Timeout, 0, null);
                         return;
                     }
                     break;
 
                 case ConnectionState.ShutdownRequested:
-                    if (_timeSinceLastPacket > NetManager.DisconnectTimeout)
+                    if (_timeSinceLastPacket > PromulManager.DisconnectTimeout)
                     {
                         ConnectionState = ConnectionState.Disconnected;
                     }
@@ -1024,25 +1026,25 @@ namespace Promul.Common.Networking
                         if (_shutdownTimer >= ShutdownDelay)
                         {
                             _shutdownTimer = 0;
-                            await NetManager.SendRaw(_shutdownPacket, EndPoint);
+                            await PromulManager.SendRaw(_shutdownPacket, EndPoint);
                         }
                     }
                     return;
 
                 case ConnectionState.Outgoing:
                     _connectTimer += deltaTime;
-                    if (_connectTimer > NetManager.ReconnectDelay)
+                    if (_connectTimer > PromulManager.ReconnectDelay)
                     {
                         _connectTimer = 0;
                         _connectAttempts++;
-                        if (_connectAttempts > NetManager.MaximumConnectionAttempts)
+                        if (_connectAttempts > PromulManager.MaximumConnectionAttempts)
                         {
-                            await NetManager.ForceDisconnectPeerAsync(this, DisconnectReason.ConnectionFailed, 0, null);
+                            await PromulManager.ForceDisconnectPeerAsync(this, DisconnectReason.ConnectionFailed, 0, null);
                             return;
                         }
 
                         //else send connect again
-                        await NetManager.SendRaw(_connectRequestPacket, EndPoint);
+                        await PromulManager.SendRaw(_connectRequestPacket, EndPoint);
                     }
                     return;
 
@@ -1052,7 +1054,7 @@ namespace Promul.Common.Networking
 
             //Send ping
             _pingSendTimer += deltaTime;
-            if (_pingSendTimer >= NetManager.PingInterval)
+            if (_pingSendTimer >= PromulManager.PingInterval)
             {
                 NetDebug.Write("[PP] Send ping...");
                 //reset timer
@@ -1063,12 +1065,12 @@ namespace Promul.Common.Networking
                 if (_pingTimer.IsRunning)
                     UpdateRoundTripTime((int)_pingTimer.ElapsedMilliseconds);
                 _pingTimer.Restart();
-                await NetManager.SendRaw(_pingPacket, EndPoint);
+                await PromulManager.SendRaw(_pingPacket, EndPoint);
             }
 
             //RTT - round trip time
             _rttResetTimer += deltaTime;
-            if (_rttResetTimer >= NetManager.PingInterval * 3)
+            if (_rttResetTimer >= PromulManager.PingInterval * 3)
             {
                 _rttResetTimer = 0;
                 _rtt = RoundTripTime;
@@ -1107,7 +1109,7 @@ namespace Promul.Common.Networking
         }
 
         //For reliable channel
-        internal async Task RecycleAndDeliver(NetPacket packet)
+        internal async Task RecycleAndDeliver(NetworkPacket packet)
         {
             //if (packet.UserData != null)
             //{
@@ -1118,7 +1120,7 @@ namespace Promul.Common.Networking
                     if (fragCount == packet.FragmentsTotal)
                     {
                         // TODO FIX THIS
-                        await NetManager.MessageDelivered(this, null);
+                        await PromulManager.MessageDelivered(this, null);
                         _deliveredFragments.Remove(packet.FragmentId);
                     }
                     else
@@ -1129,7 +1131,7 @@ namespace Promul.Common.Networking
                 else
                 {
                     // TODO FIX THIS
-                    await NetManager.MessageDelivered(this, null);
+                    await PromulManager.MessageDelivered(this, null);
                 }
                 //packet.UserData = null;
             //}

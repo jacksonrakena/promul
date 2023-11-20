@@ -1,14 +1,15 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Promul.Common.Networking.Packets;
 
-namespace Promul.Common.Networking
+namespace Promul.Common.Networking.Channels
 {
     internal sealed class ReliableChannel : ChannelBase
     {
         private struct PendingReliablePacket
         {
-            private NetPacket? _packet;
+            private NetworkPacket? _packet;
             private long _timeStamp;
             private bool _isSent;
 
@@ -17,14 +18,14 @@ namespace Promul.Common.Networking
                 return _packet == null ? "Empty" : _packet.Sequence.ToString();
             }
 
-            public void Init(NetPacket packet)
+            public void Init(NetworkPacket packet)
             {
                 _packet = packet;
                 _isSent = false;
             }
 
             //Returns true if there is a pending packet inside
-            public async Task<bool> TrySendAsync(long currentTime, NetPeer peer)
+            public async Task<bool> TrySendAsync(long currentTime, PromulPeer peer)
             {
                 if (_packet == null)
                     return false;
@@ -43,7 +44,7 @@ namespace Promul.Common.Networking
                 return true;
             }
 
-            public async Task<bool> ClearAsync(NetPeer peer)
+            public async Task<bool> ClearAsync(PromulPeer peer)
             {
                 if (_packet != null)
                 {
@@ -55,9 +56,9 @@ namespace Promul.Common.Networking
             }
         }
 
-        private readonly NetPacket _outgoingAcks;            //for send acks
+        private readonly NetworkPacket _outgoingAcks;            //for send acks
         private readonly PendingReliablePacket[] _pendingPackets;    //for unacked packets and duplicates
-        private readonly NetPacket[]? _receivedPackets;       //for order
+        private readonly NetworkPacket[]? _receivedPackets;       //for order
         private readonly bool[]? _earlyReceived;              //for unordered
 
         private int _localSequence;
@@ -73,7 +74,7 @@ namespace Promul.Common.Networking
         private const int BitsInByte = 8;
         private readonly byte _id;
 
-        public ReliableChannel(NetPeer peer, bool ordered, byte id) : base(peer)
+        public ReliableChannel(PromulPeer peer, bool ordered, byte id) : base(peer)
         {
             _id = id;
             _windowSize = NetConstants.DefaultWindowSize;
@@ -85,7 +86,7 @@ namespace Promul.Common.Networking
             if (_ordered)
             {
                 _deliveryMethod = DeliveryMethod.ReliableOrdered;
-                _receivedPackets = new NetPacket[_windowSize];
+                _receivedPackets = new NetworkPacket[_windowSize];
             }
             else
             {
@@ -97,13 +98,13 @@ namespace Promul.Common.Networking
             _localSequence = 0;
             _remoteSequence = 0;
             _remoteWindowStart = 0;
-            _outgoingAcks = NetPacket.FromProperty(PacketProperty.Ack, (_windowSize - 1) / BitsInByte + 2);
+            _outgoingAcks = NetworkPacket.FromProperty(PacketProperty.Ack, (_windowSize - 1) / BitsInByte + 2);
             _outgoingAcks.ChannelId = id;
         }
 
         private SemaphoreSlim _pendingPacketsSemaphore = new SemaphoreSlim(1, 1);
         //ProcessAck in packet
-        private async Task ProcessAckAsync(NetPacket packet)
+        private async Task ProcessAckAsync(NetworkPacket packet)
         {
             if (packet.Data.Count != _outgoingAcks.Data.Count)
             {
@@ -145,10 +146,10 @@ namespace Promul.Common.Networking
                     int currentBit = pendingIdx % BitsInByte;
                     if ((packet.Data[packet.Data.Offset + currentByte] & (1 << currentBit)) == 0)
                     {
-                        if (Peer.NetManager.RecordNetworkStatistics)
+                        if (Peer.PromulManager.RecordNetworkStatistics)
                         {
                             Peer.Statistics.IncrementPacketLoss();
-                            Peer.NetManager.Statistics.IncrementPacketLoss();
+                            Peer.PromulManager.Statistics.IncrementPacketLoss();
                         }
 
                         //Skip false ack
@@ -222,7 +223,7 @@ namespace Promul.Common.Networking
         }
 
         //Process incoming packet
-        public override async Task<bool> HandlePacketAsync(NetPacket packet)
+        public override async Task<bool> HandlePacketAsync(NetworkPacket packet)
         {
             if (packet.Property == PacketProperty.Ack)
             {
@@ -312,7 +313,7 @@ namespace Promul.Common.Networking
 
                 if (_ordered)
                 {
-                    NetPacket p;
+                    NetworkPacket p;
                     while ((p = _receivedPackets[_remoteSequence % _windowSize]) != null)
                     {
                         //process holden packet
