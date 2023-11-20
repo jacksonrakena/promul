@@ -1,16 +1,17 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Promul.Common.Networking
 {
-    internal sealed class SequencedChannel : BaseChannel
+    internal sealed class SequencedChannel : ChannelBase
     {
         private int _localSequence;
         private ushort _remoteSequence;
         private readonly bool _reliable;
-        private NetPacket _lastPacket;
-        private readonly NetPacket _ackPacket;
+        private NetPacket? _lastPacket;
+        private readonly NetPacket? _ackPacket;
         private bool _mustSendAck;
         private readonly byte _id;
         private long _lastPacketSendTime;
@@ -26,8 +27,8 @@ namespace Promul.Common.Networking
             }
         }
 
-        SemaphoreSlim outgoingQueueSem = new SemaphoreSlim(1, 1);
-        protected override async Task<bool> SendNextPackets()
+        private readonly SemaphoreSlim _outgoingQueueSem = new SemaphoreSlim(1, 1);
+        protected override async Task<bool> FlushQueueAsync()
         {
             if (_reliable && OutgoingQueue.Count == 0)
             {
@@ -45,7 +46,7 @@ namespace Promul.Common.Networking
             }
             else
             {
-                await outgoingQueueSem.WaitAsync();
+                await _outgoingQueueSem.WaitAsync();
 
                 while (OutgoingQueue.Count > 0)
                 {
@@ -66,20 +67,20 @@ namespace Promul.Common.Networking
                     }
                 }
                 
-                outgoingQueueSem.Release();
+                _outgoingQueueSem.Release();
             }
 
             if (_reliable && _mustSendAck)
             {
                 _mustSendAck = false;
-                _ackPacket.Sequence = _remoteSequence;
+                _ackPacket!.Sequence = _remoteSequence;
                 await Peer.SendUserData(_ackPacket);
             }
 
             return _lastPacket != null;
         }
 
-        public override async Task<bool> ProcessPacket(NetPacket packet)
+        public override async Task<bool> HandlePacketAsync(NetPacket packet)
         {
             if (packet.IsFragmented)
                 return false;

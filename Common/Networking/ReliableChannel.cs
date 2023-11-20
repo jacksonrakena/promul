@@ -4,11 +4,11 @@ using System.Threading.Tasks;
 
 namespace Promul.Common.Networking
 {
-    internal sealed class ReliableChannel : BaseChannel
+    internal sealed class ReliableChannel : ChannelBase
     {
-        private struct PendingPacket
+        private struct PendingReliablePacket
         {
-            private NetPacket _packet;
+            private NetPacket? _packet;
             private long _timeStamp;
             private bool _isSent;
 
@@ -43,11 +43,11 @@ namespace Promul.Common.Networking
                 return true;
             }
 
-            public bool Clear(NetPeer peer)
+            public async Task<bool> ClearAsync(NetPeer peer)
             {
                 if (_packet != null)
                 {
-                    peer.RecycleAndDeliver(_packet);
+                    await peer.RecycleAndDeliver(_packet);
                     _packet = null;
                     return true;
                 }
@@ -56,11 +56,11 @@ namespace Promul.Common.Networking
         }
 
         private readonly NetPacket _outgoingAcks;            //for send acks
-        private readonly PendingPacket[] _pendingPackets;    //for unacked packets and duplicates
-        private readonly NetPacket[] _receivedPackets;       //for order
-        private readonly bool[] _earlyReceived;              //for unordered
+        private readonly PendingReliablePacket[] _pendingPackets;    //for unacked packets and duplicates
+        private readonly NetPacket[]? _receivedPackets;       //for order
+        private readonly bool[]? _earlyReceived;              //for unordered
 
-        private int _localSeqence;
+        private int _localSequence;
         private int _remoteSequence;
         private int _localWindowStart;
         private int _remoteWindowStart;
@@ -78,9 +78,9 @@ namespace Promul.Common.Networking
             _id = id;
             _windowSize = NetConstants.DefaultWindowSize;
             _ordered = ordered;
-            _pendingPackets = new PendingPacket[_windowSize];
+            _pendingPackets = new PendingReliablePacket[_windowSize];
             for (int i = 0; i < _pendingPackets.Length; i++)
-                _pendingPackets[i] = new PendingPacket();
+                _pendingPackets[i] = new PendingReliablePacket();
 
             if (_ordered)
             {
@@ -94,15 +94,16 @@ namespace Promul.Common.Networking
             }
 
             _localWindowStart = 0;
-            _localSeqence = 0;
+            _localSequence = 0;
             _remoteSequence = 0;
             _remoteWindowStart = 0;
             _outgoingAcks = NetPacket.FromProperty(PacketProperty.Ack, (_windowSize - 1) / BitsInByte + 2);
             _outgoingAcks.ChannelId = id;
         }
 
+        private SemaphoreSlim _pendingPacketsSemaphore = new SemaphoreSlim(1, 1);
         //ProcessAck in packet
-        private void ProcessAck(NetPacket packet)
+        private async Task ProcessAckAsync(NetPacket packet)
         {
             if (packet.Data.Count != _outgoingAcks.Data.Count)
             {
@@ -125,11 +126,12 @@ namespace Promul.Common.Networking
                 return;
             }
 
-            lock (_pendingPackets)
+            await _pendingPacketsSemaphore.WaitAsync();
+            try
             {
                 for (int pendingSeq = _localWindowStart;
-                    pendingSeq != _localSeqence;
-                    pendingSeq = (pendingSeq + 1) % NetConstants.MaxSequence)
+                     pendingSeq != _localSequence;
+                     pendingSeq = (pendingSeq + 1) % NetConstants.MaxSequence)
                 {
                     int rel = NetUtils.RelativeSequenceNumber(pendingSeq, ackWindowStart);
                     if (rel >= _windowSize)
@@ -141,7 +143,7 @@ namespace Promul.Common.Networking
                     int pendingIdx = pendingSeq % _windowSize;
                     int currentByte = NetConstants.ChanneledHeaderSize + pendingIdx / BitsInByte;
                     int currentBit = pendingIdx % BitsInByte;
-                    if ((packet.Data[packet.Data.Offset+currentByte] & (1 << currentBit)) == 0)
+                    if ((packet.Data[packet.Data.Offset + currentByte] & (1 << currentBit)) == 0)
                     {
                         if (Peer.NetManager.EnableStatistics)
                         {
@@ -161,16 +163,19 @@ namespace Promul.Common.Networking
                     }
 
                     //clear packet
-                    if (_pendingPackets[pendingIdx].Clear(Peer))
+                    if (await _pendingPackets[pendingIdx].ClearAsync(Peer))
                         NetDebug.Write($"[PA]Removing reliableInOrder ack: {pendingSeq} - true");
                 }
+            }
+            finally
+            {
+                _pendingPacketsSemaphore.Release();
             }
         }
 
         SemaphoreSlim pendingPacketsSem = new SemaphoreSlim(1, 1);
-        SemaphoreSlim outgoingQueueSem = new SemaphoreSlim(1, 1);
         SemaphoreSlim outgoingAcksSem = new SemaphoreSlim(1, 1);
-        protected override async Task<bool> SendNextPackets()
+        protected override async Task<bool> FlushQueueAsync()
         {
             if (_mustSendAcks)
             {
@@ -186,30 +191,30 @@ namespace Promul.Common.Networking
 
             await pendingPacketsSem.WaitAsync();
             
-                //get packets from queue
-                lock (OutgoingQueue)
+            //get packets from queue
+            lock (OutgoingQueue)
+            {
+                while (OutgoingQueue.Count > 0)
                 {
-                    while (OutgoingQueue.Count > 0)
-                    {
-                        int relate = NetUtils.RelativeSequenceNumber(_localSeqence, _localWindowStart);
-                        if (relate >= _windowSize)
-                            break;
+                    int relate = NetUtils.RelativeSequenceNumber(_localSequence, _localWindowStart);
+                    if (relate >= _windowSize)
+                        break;
 
-                        var netPacket = OutgoingQueue.Dequeue();
-                        netPacket.Sequence = (ushort) _localSeqence;
-                        netPacket.ChannelId = _id;
-                        _pendingPackets[_localSeqence % _windowSize].Init(netPacket);
-                        _localSeqence = (_localSeqence + 1) % NetConstants.MaxSequence;
-                    }
+                    var netPacket = OutgoingQueue.Dequeue();
+                    netPacket.Sequence = (ushort) _localSequence;
+                    netPacket.ChannelId = _id;
+                    _pendingPackets[_localSequence % _windowSize].Init(netPacket);
+                    _localSequence = (_localSequence + 1) % NetConstants.MaxSequence;
                 }
+            }
 
-                //send
-                for (int pendingSeq = _localWindowStart; pendingSeq != _localSeqence; pendingSeq = (pendingSeq + 1) % NetConstants.MaxSequence)
-                {
-                    // Please note: TrySend is invoked on a mutable struct, it's important to not extract it into a variable here
-                    if (await _pendingPackets[pendingSeq % _windowSize].TrySendAsync(currentTime, Peer))
-                        hasPendingPackets = true;
-                }
+            //send
+            for (int pendingSeq = _localWindowStart; pendingSeq != _localSequence; pendingSeq = (pendingSeq + 1) % NetConstants.MaxSequence)
+            {
+                // Please note: TrySend is invoked on a mutable struct, it's important to not extract it into a variable here
+                if (await _pendingPackets[pendingSeq % _windowSize].TrySendAsync(currentTime, Peer))
+                    hasPendingPackets = true;
+            }
             
             pendingPacketsSem.Release();
 
@@ -217,11 +222,11 @@ namespace Promul.Common.Networking
         }
 
         //Process incoming packet
-        public override async Task<bool> ProcessPacket(NetPacket packet)
+        public override async Task<bool> HandlePacketAsync(NetPacket packet)
         {
             if (packet.Property == PacketProperty.Ack)
             {
-                ProcessAck(packet);
+                await ProcessAckAsync(packet);
                 return false;
             }
             int seq = packet.Sequence;
@@ -284,7 +289,7 @@ namespace Promul.Common.Networking
                 ackIdx = seq % _windowSize;
                 ackByte = NetConstants.ChanneledHeaderSize + ackIdx / BitsInByte;
                 ackBit = ackIdx % BitsInByte;
-                if ((_outgoingAcks.Data.Array[_outgoingAcks.Data.Offset+ackByte] & (1 << ackBit)) != 0)
+                if ((_outgoingAcks.Data[ackByte] & (1 << ackBit)) != 0)
                 {
                     NetDebug.Write("[RR]ReliableInOrder duplicate");
                     //because _mustSendAcks == true

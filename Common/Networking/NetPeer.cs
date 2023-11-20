@@ -83,8 +83,8 @@ namespace Promul.Common.Networking
         //Channels
         private readonly Queue<NetPacket> _unreliableChannel;
         SemaphoreSlim _unreliableChannelSemaphore = new SemaphoreSlim(1, 1);
-        private readonly ConcurrentQueue<BaseChannel> _channelSendQueue;
-        private readonly BaseChannel?[] _channels;
+        private readonly ConcurrentQueue<ChannelBase> _channelSendQueue;
+        private readonly ChannelBase?[] _channels;
 
         //MTU
         private int _mtuIdx;
@@ -215,8 +215,8 @@ namespace Promul.Common.Networking
             _holdedFragments = new Dictionary<ushort, IncomingFragments>();
             _deliveredFragments = new Dictionary<ushort, ushort>();
 
-            _channels = new BaseChannel[netManager.ChannelsCount * NetConstants.ChannelTypeCount];
-            _channelSendQueue = new ConcurrentQueue<BaseChannel>();
+            _channels = new ChannelBase[netManager.ChannelsCount * NetConstants.ChannelTypeCount];
+            _channelSendQueue = new ConcurrentQueue<ChannelBase>();
         }
 
         internal void InitiateEndPointChange()
@@ -315,9 +315,9 @@ namespace Promul.Common.Networking
         //     }
         // }
 
-        private BaseChannel CreateChannel(byte idx)
+        private ChannelBase CreateChannel(byte idx)
         {
-            BaseChannel newChannel = _channels[idx];
+            ChannelBase newChannel = _channels[idx];
             if (newChannel != null)
                 return newChannel;
             switch ((DeliveryMethod)(idx % NetConstants.ChannelTypeCount))
@@ -335,7 +335,7 @@ namespace Promul.Common.Networking
                     newChannel = new SequencedChannel(this, true, idx);
                     break;
             }
-            BaseChannel prevChannel = Interlocked.CompareExchange(ref _channels[idx], newChannel, null);
+            ChannelBase prevChannel = Interlocked.CompareExchange(ref _channels[idx], newChannel, null);
             if (prevChannel != null)
                 return prevChannel;
 
@@ -391,8 +391,8 @@ namespace Promul.Common.Networking
             _holdedFragments = new Dictionary<ushort, IncomingFragments>();
             _deliveredFragments = new Dictionary<ushort, ushort>();
 
-            _channels = new BaseChannel[netManager.ChannelsCount * NetConstants.ChannelTypeCount];
-            _channelSendQueue = new ConcurrentQueue<BaseChannel>();
+            _channels = new ChannelBase[netManager.ChannelsCount * NetConstants.ChannelTypeCount];
+            _channelSendQueue = new ConcurrentQueue<ChannelBase>();
 
             ConnectTime = connectTime;
             ConnectionNum = connectionNumber;
@@ -472,7 +472,7 @@ namespace Promul.Common.Networking
 
             //Select channel
             PacketProperty property;
-            BaseChannel?  channel = null;
+            ChannelBase?  channel = null;
 
             if (deliveryMethod == DeliveryMethod.Unreliable)
             {
@@ -525,7 +525,7 @@ namespace Promul.Common.Networking
                     p.MarkFragmented();
 
                     if (data.Array != null) Buffer.BlockCopy(data.Array, data.Offset + partIdx * packetDataSize, p.Data.Array,p.Data.Offset+NetConstants.FragmentedHeaderTotalSize, sendLength);
-                    channel?.AddToQueue(p);
+                    channel?.EnqueuePacket(p);
 
                     length -= sendLength;
                 }
@@ -546,7 +546,7 @@ namespace Promul.Common.Networking
             }
             else
             {
-                channel.AddToQueue(packet);
+                channel.EnqueuePacket(packet);
             }
         }
 
@@ -564,7 +564,7 @@ namespace Promul.Common.Networking
             return DisconnectResult.None;
         }
 
-        internal void AddToReliableChannelSendQueue(BaseChannel channel)
+        internal void AddToReliableChannelSendQueue(ChannelBase channel)
         {
             _channelSendQueue.Enqueue(channel);
         }
@@ -931,7 +931,7 @@ namespace Promul.Common.Networking
                     var channel = _channels[packet.ChannelId] ?? (packet.Property == PacketProperty.Ack ? null : CreateChannel(packet.ChannelId));
                     if (channel != null)
                     {
-                        if (!await channel.ProcessPacket(packet)) {}
+                        if (!await channel.HandlePacketAsync(packet)) {}
                             //NetManager.PoolRecycle(packet);
                     }
                     break;
@@ -1096,7 +1096,7 @@ namespace Promul.Common.Networking
             {
                 if (!_channelSendQueue.TryDequeue(out var channel))
                     break;
-                if (await channel.SendAndCheckQueue())
+                if (await channel.UpdateQueueAsync())
                 {
                     // still has something to send, re-add it to the send queue
                     _channelSendQueue.Enqueue(channel);
