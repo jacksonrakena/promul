@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
@@ -76,6 +77,7 @@ namespace Promul.Runtime
         
         public override void Send(ulong clientId, ArraySegment<byte> data, NetworkDelivery qos)
         {
+            Debug.Log("Sending: " + string.Join(" ", data.Select(e => e.ToString("X"))));
             Task.Run(async () =>
             {
                 await SendControl(new RelayControlMessage
@@ -87,7 +89,7 @@ namespace Promul.Runtime
             });
         }
 
-        async Task OnNetworkReceive(PromulPeer peer, BinaryReader reader, byte channel, DeliveryMethod deliveryMethod)
+        async Task OnNetworkReceive(PromulPeer peer, CompositeReader reader, byte channel, DeliveryMethod deliveryMethod)
         {
             var message = reader.ReadRelayControlMessage();
             var author = message.AuthorClientId;
@@ -110,7 +112,10 @@ namespace Promul.Runtime
                 // Relayed data
                 case RelayControlMessageType.Data:
                 {
-                    _queue.Enqueue((NetworkEvent.Data, author, message.Data, 0));
+                    Debug.Log("Data: " + string.Join(" ", message.Data.Select(e => e.ToString("X"))));
+                    var data = new byte[message.Data.Count];
+                    message.Data.CopyTo(data);
+                    _queue.Enqueue((NetworkEvent.Data, author, data, 0));
                         break;
                 }
                 case RelayControlMessageType.KickFromRelay:

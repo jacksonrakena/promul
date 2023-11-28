@@ -11,8 +11,8 @@ namespace Promul.Common.Networking
         public delegate Task PeerConnectedEvent(PromulPeer peer);
         public delegate Task PeerDisconnectedEvent(PromulPeer peer, DisconnectInfo disconnectInfo);
         public delegate Task NetworkErrorEvent(IPEndPoint endPoint, SocketError socketError);
-        public delegate Task NetworkReceiveEvent(PromulPeer peer, BinaryReader reader, byte channel, DeliveryMethod deliveryMethod);
-        public delegate Task ConnectionlessReceiveEvent(IPEndPoint remoteEndPoint, BinaryReader reader, UnconnectedMessageType messageType);
+        public delegate Task NetworkReceiveEvent(PromulPeer peer, CompositeReader reader, byte channel, DeliveryMethod deliveryMethod);
+        public delegate Task ConnectionlessReceiveEvent(IPEndPoint remoteEndPoint, CompositeReader reader, UnconnectedMessageType messageType);
         public delegate Task NetworkLatencyUpdateEvent(PromulPeer peer, int latency);
         public delegate Task ConnectionRequestEvent(ConnectionRequest request);
         public delegate Task DeliveryEvent(PromulPeer peer, object? userData);

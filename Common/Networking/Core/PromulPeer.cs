@@ -379,6 +379,8 @@ namespace Promul.Common.Networking
             byte channelNumber,
             DeliveryMethod deliveryMethod)
         {
+            
+            NetDebug.Write("SendInternal: " + string.Join(" ", data.Select(x => x.ToString("X"))));
             var length = data.Count;
             if (ConnectionState != ConnectionState.Connected || channelNumber >= _channels.Length)
                 return;
@@ -720,15 +722,12 @@ namespace Promul.Common.Networking
                 NetDebug.Write("[P]Send merged: " + _mergePos + ", count: " + _mergeCount);
                 bytesSent = await PromulManager.SendRaw(new ArraySegment<byte>(_mergeData.Data.Array, _mergeData.Data.Offset, NetConstants.HeaderSize + _mergePos),
                     EndPoint); 
-                //_mergeData.RawData, 0, NetConstants.HeaderSize + _mergePos, _remoteEndPoint);
             }
             else
             {
                 //Send without length information and merging
                 bytesSent = await PromulManager.SendRaw(new ArraySegment<byte>(_mergeData.Data.Array, _mergeData.Data.Offset+NetConstants.HeaderSize + 2, _mergePos - 2),
                     EndPoint);
-                
-                //_mergeData.RawData, NetConstants.HeaderSize + 2, _mergePos - 2, _remoteEndPoint);
             }
 
             if (PromulManager.RecordNetworkStatistics)

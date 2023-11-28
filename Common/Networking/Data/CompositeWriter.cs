@@ -17,7 +17,7 @@ namespace Promul.Common.Networking.Data
 
         public static implicit operator ArraySegment<byte>(CompositeWriter cmpw)
         {
-            return cmpw._ms.GetBuffer();
+            return new ArraySegment<byte>(cmpw._ms.GetBuffer(), 0, (int)cmpw._ms.Length);
         }
     }
 }

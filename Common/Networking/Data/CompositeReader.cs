@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace Promul.Common.Networking.Data
@@ -7,24 +8,26 @@ namespace Promul.Common.Networking.Data
     public class CompositeReader : BinaryReader
     {
         readonly MemoryStream _ms;
-        private CompositeReader(MemoryStream memory) : base(memory)
+        readonly ArraySegment<byte> _data;
+        private CompositeReader(MemoryStream memory, ArraySegment<byte> data) : base(memory)
         {
             _ms = memory;
+            _data = data;
         }
 
         public ArraySegment<byte> ReadRemainingBytes()
         {
-            return new ArraySegment<byte>(_ms.GetBuffer(), (int)_ms.Position, (int)(_ms.Capacity - _ms.Position));
+            return new ArraySegment<byte>(_data.Array, _data.Offset+(int)_ms.Position, (int)(_data.Count - _ms.Position));
         }
 
-        public static CompositeReader Create()
+        internal static CompositeReader Create(ArraySegment<byte> data)
         {
-            return new CompositeReader(new MemoryStream());
+            return new CompositeReader(new MemoryStream(data.Array, data.Offset, data.Count), data);
         }
 
         public static implicit operator ArraySegment<byte>(CompositeReader cmpw)
         {
-            return cmpw._ms.GetBuffer();
+            return new ArraySegment<byte>(cmpw._ms.GetBuffer(), 0, (int)cmpw._ms.Length);
         }
     }
 }

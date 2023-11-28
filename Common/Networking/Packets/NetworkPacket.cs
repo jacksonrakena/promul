@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using Promul.Common.Networking.Data;
 using Promul.Common.Networking.Packets.Internal;
 
 namespace Promul.Common.Networking.Packets
@@ -162,10 +163,10 @@ namespace Promul.Common.Networking.Packets
             return Data.Count >= headerSize && (!fragmented || Data.Count >= headerSize + NetConstants.FragmentHeaderSize);
         }
 
-        public BinaryReader CreateReader(int headerSize)
+        public CompositeReader CreateReader(int headerSize)
         {
-            return new BinaryReader(new MemoryStream(Data.Array, Data.Offset + headerSize,
-                Data.Count - headerSize));
+            var compositeData = new ArraySegment<byte>(Data.Array, Data.Offset + headerSize, Data.Count - headerSize);
+            return CompositeReader.Create(compositeData);
         }
     }
 }

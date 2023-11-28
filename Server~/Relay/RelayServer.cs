@@ -51,7 +51,7 @@ public class RelayServer
         _sessionsByCode.Remove(session.JoinCode);
     }
 
-    public async Task OnNetworkReceive(PromulPeer peer, BinaryReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
+    public async Task OnNetworkReceive(PromulPeer peer, CompositeReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
         var packet = reader.ReadRelayControlMessage();
 

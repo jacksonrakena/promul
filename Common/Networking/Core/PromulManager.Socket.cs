@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
@@ -83,6 +84,7 @@ namespace Promul.Common.Networking
             var receiveBuffer = new byte[NetConstants.MaxPacketSize];
             var receive = await s.ReceiveFromAsync(receiveBuffer, SocketFlags.None, bufferEndPoint);
             var packet = NetworkPacket.FromBuffer(new ArraySegment<byte>(receiveBuffer, 0, receive.ReceivedBytes));
+            NetDebug.Write("Received: " + string.Join(" ", new ArraySegment<byte>(receiveBuffer, 0, receive.ReceivedBytes).Select(e => e.ToString("X"))));
             await OnMessageReceived(packet, (IPEndPoint) receive.RemoteEndPoint);
         }
 

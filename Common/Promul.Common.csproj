@@ -7,6 +7,7 @@
         <AssemblyName>promul-common~</AssemblyName>
         <BaseOutputPath>bin~</BaseOutputPath>
         <BaseIntermediateOutputPath>obj~</BaseIntermediateOutputPath>
+        <DefineConstants>DEBUG;DEBUG_MESSAGES</DefineConstants> 
     </PropertyGroup>
 
 </Project>
