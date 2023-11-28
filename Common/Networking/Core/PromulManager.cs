@@ -26,6 +26,8 @@ namespace Promul.Common.Networking
             public IPEndPoint EndPoint;
             public DateTime TimeWhenGet;
         }
+
+        private readonly SemaphoreSlim _pingSimulationSemaphore = new SemaphoreSlim(1, 1);
         private readonly List<IncomingData> _pingSimulationList = new List<IncomingData>();
         private readonly Random _randomGenerator = new Random();
         private const int MinLatencyThreshold = 5;
@@ -37,7 +39,7 @@ namespace Promul.Common.Networking
         private volatile PromulPeer? _headPeer;
         private int _connectedPeersCount;
         private readonly List<PromulPeer> _connectedPeerListCache = new();
-        private PromulPeer[] _peersArray = new PromulPeer[32];
+        private PromulPeer?[] _peersArray = new PromulPeer[32];
         private readonly PacketLayerBase? _extraPacketLayer;
         private int _lastPeerId;
         private ConcurrentQueue<int> _peerIds = new();
@@ -284,56 +286,55 @@ namespace Promul.Common.Networking
         }
         
 
-        [Conditional("DEBUG")]
-        private void ProcessDelayedPackets()
+        private async Task ProcessDelayedPackets()
         {
 #if DEBUG
             if (!SimulateLatency)
                 return;
 
             var time = DateTime.UtcNow;
-            lock (_pingSimulationList)
+            await _pingSimulationSemaphore.WaitAsync();
+            try
             {
                 for (int i = 0; i < _pingSimulationList.Count; i++)
                 {
                     var incomingData = _pingSimulationList[i];
                     if (incomingData.TimeWhenGet <= time)
                     {
-                        DebugMessageReceived(incomingData.Data, incomingData.EndPoint);
+                        await DebugMessageReceived(incomingData.Data, incomingData.EndPoint);
                         _pingSimulationList.RemoveAt(i);
                         i--;
                     }
                 }
+            }
+            finally
+            {
+                _pingSimulationSemaphore.Release(); 
             }
 #endif
         }
 
         private void ProcessNtpRequests(long elapsedMilliseconds)
         {
-            List<IPEndPoint> requestsToRemove = null;
+            List<IPEndPoint>? requestsToRemove = null;
             foreach (var ntpRequest in _ntpRequests)
             {
-                ntpRequest.Value.Send(_udpSocketv4, elapsedMilliseconds);
-                if(ntpRequest.Value.NeedToKill)
-                {
-                    if (requestsToRemove == null)
-                        requestsToRemove = new List<IPEndPoint>();
-                    requestsToRemove.Add(ntpRequest.Key);
-                }
+                if (_udpSocketv4 != null) ntpRequest.Value.Send(_udpSocketv4, elapsedMilliseconds);
+                if (!ntpRequest.Value.NeedToKill) continue;
+                requestsToRemove ??= new List<IPEndPoint>();
+                requestsToRemove.Add(ntpRequest.Key);
             }
 
-            if (requestsToRemove != null)
+            if (requestsToRemove == null) return;
+            foreach (var ipEndPoint in requestsToRemove)
             {
-                foreach (var ipEndPoint in requestsToRemove)
-                {
-                    _ntpRequests.TryRemove(ipEndPoint, out _);
-                }
+                _ntpRequests.TryRemove(ipEndPoint, out _);
             }
         }
 
         internal async Task<PromulPeer> OnConnectionRequestResolved(ConnectionRequest request, ArraySegment<byte> data)
         {
-            PromulPeer PromulPeer = null;
+            PromulPeer? peer = null;
 
             if (request.Result == ConnectionRequestResult.RejectForce)
             {
@@ -351,29 +352,29 @@ namespace Promul.Common.Networking
             }
             else
             {
-                if (_peers.TryGetValue(request.RemoteEndPoint, out PromulPeer))
+                if (_peers.TryGetValue(request.RemoteEndPoint, out peer))
                 {
                     //already have peer
                 }
                 else if (request.Result == ConnectionRequestResult.Reject)
                 {
-                    PromulPeer = new PromulPeer(this, request.RemoteEndPoint, GetNextPeerId());
-                    await PromulPeer.RejectAsync(request.InternalPacket, data);
-                    AddPeer(PromulPeer);
+                    peer = new PromulPeer(this, request.RemoteEndPoint, GetNextPeerId());
+                    await peer.RejectAsync(request.InternalPacket, data);
+                    AddPeer(peer);
                     NetDebug.Write(NetLogLevel.Trace, "[NM] Peer connect reject.");
                 }
                 else //Accept
                 {
-                    PromulPeer = await PromulPeer.AcceptAsync(this, request, GetNextPeerId());
-                    AddPeer(PromulPeer);
-                    if (OnPeerConnected != null) await OnPeerConnected(PromulPeer);
-                    NetDebug.Write(NetLogLevel.Trace, $"[NM] Received peer connection Id: {PromulPeer.ConnectTime}, EP: {PromulPeer.EndPoint}");
+                    peer = await PromulPeer.AcceptAsync(this, request, GetNextPeerId());
+                    AddPeer(peer);
+                    if (OnPeerConnected != null) await OnPeerConnected(peer);
+                    NetDebug.Write(NetLogLevel.Trace, $"[NM] Received peer connection Id: {peer.ConnectTime}, EP: {peer.EndPoint}");
                 }
             }
 
             _connectionRequests.Remove(request.RemoteEndPoint);
 
-            return PromulPeer;
+            return peer;
         }
 
         private int GetNextPeerId()
@@ -383,7 +384,7 @@ namespace Promul.Common.Networking
 
         private async Task ProcessConnectRequest(
             IPEndPoint remoteEndPoint,
-            PromulPeer PromulPeer,
+            PromulPeer? PromulPeer,
             NetConnectRequestPacket connRequest)
         {
             //if we have peer
@@ -415,7 +416,7 @@ namespace Promul.Common.Networking
                 //ConnectRequestResult.NewConnection
                 //Set next connection number
                 if(processResult != ConnectRequestResult.P2PLose)
-                    connRequest.ConnectionNumber = (byte)((PromulPeer.ConnectionNum + 1) % NetConstants.MaxConnectionNumber);
+                    connRequest.ConnectionNumber = (byte)((PromulPeer.ConnectionNumber + 1) % NetConstants.MaxConnectionNumber);
                 //To reconnect peer
             }
             else
@@ -468,6 +469,8 @@ namespace Promul.Common.Networking
         private async Task DebugMessageReceived(NetworkPacket packet, IPEndPoint remoteEndPoint)
         {
 #endif
+            NetDebug.Write($"Received packet of type {packet.Property}, {packet.Data.Count} bytes of data");
+            //NetDebug.Write($"Data: {string.Join(" ", packet.Data.Select(e => e.ToString("X")))}");
             var originalPacketSize = packet.Data.Count;
             if (RecordNetworkStatistics)
             {
@@ -521,67 +524,58 @@ namespace Promul.Common.Networking
                 return;
             }
 
+            // For messages that don't use the peer topology,
+            // handle those before checking peers to save some cycles
             switch (packet.Property)
             {
-                //special case connect request
+                case PacketProperty.Broadcast:
+                    if (!BroadcastMessagesAllowed) return;
+                    await OnConnectionlessReceive(remoteEndPoint, packet.CreateReader(packet.GetHeaderSize()), UnconnectedMessageType.Broadcast);
+                    return;
+                case PacketProperty.UnconnectedMessage:
+                    if (!ConnectionlessMessagesAllowed) return;
+                    await OnConnectionlessReceive(remoteEndPoint, packet.CreateReader(packet.GetHeaderSize()), UnconnectedMessageType.BasicMessage);
+                    return;
+                // TODO: NAT punching
+            }
+
+            var peerFound = _peers.TryGetValue(remoteEndPoint, out var memoryPeer);
+
+            if (peerFound && RecordNetworkStatistics)
+            {
+                memoryPeer!.Statistics.IncrementPacketsReceived();
+                memoryPeer.Statistics.AddBytesReceived(originalPacketSize);
+            }
+            
+            switch (packet.Property)
+            {
+                // Handle connection requests
                 case PacketProperty.ConnectRequest:
                     if (NetConnectRequestPacket.GetProtocolId(packet) != NetConstants.ProtocolId)
                     {
                         await SendRaw(NetworkPacket.FromProperty(PacketProperty.InvalidProtocol, 0), remoteEndPoint);
                         return;
                     }
-                    break;
-                //unconnected messages
-                case PacketProperty.Broadcast:
-                    if (!BroadcastMessagesAllowed)
-                        return;
-                    await OnConnectionlessReceive(remoteEndPoint, packet.CreateReader(packet.GetHeaderSize()), UnconnectedMessageType.Broadcast);
-                    return;
-                case PacketProperty.UnconnectedMessage:
-                    if (!ConnectionlessMessagesAllowed)
-                        return;
-                    
-                    await OnConnectionlessReceive(remoteEndPoint, packet.CreateReader(packet.GetHeaderSize()), UnconnectedMessageType.BasicMessage);
-                    return;
-                case PacketProperty.NatMessage:
-                    //if (NatPunchEnabled)
-                    //    NatPunchModule.ProcessMessage(remoteEndPoint, packet);
-                    return;
-            }
-
-            //Check normal packets
-            bool peerFound = _peers.TryGetValue(remoteEndPoint, out var PromulPeer);
-
-            if (peerFound && RecordNetworkStatistics)
-            {
-                PromulPeer.Statistics.IncrementPacketsReceived();
-                PromulPeer.Statistics.AddBytesReceived(originalPacketSize);
-            }
-            
-            switch (packet.Property)
-            {
-                case PacketProperty.ConnectRequest:
                     var connRequest = NetConnectRequestPacket.FromData(packet);
-                    if (connRequest != null)
-                        await ProcessConnectRequest(remoteEndPoint, PromulPeer, connRequest);
+                    if (connRequest != null) await ProcessConnectRequest(remoteEndPoint, memoryPeer, connRequest);
                     break;
                 case PacketProperty.PeerNotFound:
-                    if (peerFound) //local
+                    if (peerFound)
                     {
-                        if (PromulPeer.ConnectionState != ConnectionState.Connected)
+                        if (memoryPeer!.ConnectionState != ConnectionState.Connected)
                             return;
                         if (packet.Data.Count == 1)
                         {
                             //first reply
                             //send NetworkChanged packet
-                            PromulPeer.ResetMtu();
-                            await SendRaw(NetConnectAcceptPacket.MakeNetworkChanged(PromulPeer), remoteEndPoint);
+                            memoryPeer.ResetMtu();
+                            await SendRaw(NetConnectAcceptPacket.MakeNetworkChanged(memoryPeer), remoteEndPoint);
                             NetDebug.Write($"PeerNotFound sending connection info: {remoteEndPoint}");
                         }
                         else if (packet.Data.Count == 2 && packet.Data.Array[packet.Data.Offset+1] == 1)
                         {
                             //second reply
-                            await ForceDisconnectPeerAsync(PromulPeer, DisconnectReason.PeerNotFound, 0, null);
+                            await ForceDisconnectPeerAsync(memoryPeer, DisconnectReason.PeerNotFound, 0, null);
                         }
                     }
                     else if (packet.Data.Count > 1) //remote
@@ -600,7 +594,7 @@ namespace Promul.Common.Networking
                                 var peer = _peersArray[remoteData.PeerId];
                                 if (peer != null &&
                                     peer.ConnectTime == remoteData.ConnectionTime &&
-                                    peer.ConnectionNum == remoteData.ConnectionNumber)
+                                    peer.ConnectionNumber == remoteData.ConnectionNumber)
                                 {
                                     if (peer.ConnectionState == ConnectionState.Connected)
                                     {
@@ -613,8 +607,6 @@ namespace Promul.Common.Networking
                             }
                         }
 
-                        //PoolRecycle(packet);
-
                         //else peer really not found
                         if (!isOldPeer)
                         {
@@ -624,47 +616,44 @@ namespace Promul.Common.Networking
                         }
                     }
                     break;
+                // Remote rejected us because we sent an invalid protocol ID
                 case PacketProperty.InvalidProtocol:
-                    if (peerFound && PromulPeer.ConnectionState == ConnectionState.Outgoing)
-                        await ForceDisconnectPeerAsync(PromulPeer, DisconnectReason.InvalidProtocol, 0, null);
+                    if (peerFound && memoryPeer!.ConnectionState == ConnectionState.Outgoing)
+                        await ForceDisconnectPeerAsync(memoryPeer, DisconnectReason.InvalidProtocol, 0, null);
                     break;
                 case PacketProperty.Disconnect:
                     if (peerFound)
                     {
-                        var disconnectResult = PromulPeer.ProcessDisconnect(packet);
+                        var disconnectResult = memoryPeer!.ProcessDisconnect(packet);
                         if (disconnectResult == DisconnectResult.None)
                         {
-                            //PoolRecycle(packet);
                             return;
                         }
                         await ForceDisconnectPeerAsync(
-                            PromulPeer,
+                            memoryPeer,
                             disconnectResult == DisconnectResult.Disconnect
                             ? DisconnectReason.RemoteConnectionClose
                             : DisconnectReason.ConnectionRejected,
                             0, packet);
                     }
-                    else
-                    {
-                        //PoolRecycle(packet);
-                    }
-                    //Send shutdown
+                    
                     await SendRaw(NetworkPacket.FromProperty(PacketProperty.ShutdownOk, 0), remoteEndPoint);
                     break;
                 case PacketProperty.ConnectAccept:
-                    if (!peerFound)
-                        return;
+                    if (!peerFound) return;
                     var connAccept = NetConnectAcceptPacket.FromData(packet);
-                    if (connAccept != null && PromulPeer.ProcessConnectAccept(connAccept))
+                    if (connAccept != null && memoryPeer!.ProcessConnectAccept(connAccept))
                     {
-                        if (OnPeerConnected != null) await OnPeerConnected(PromulPeer);
+                        if (OnPeerConnected != null) await OnPeerConnected(memoryPeer);
                     }
                     break;
                 default:
-                    if(peerFound)
-                        PromulPeer.ProcessPacket(packet);
+                    if (peerFound) await memoryPeer!.ProcessPacket(packet);
                     else
-                        await SendRaw(NetworkPacket.FromProperty(PacketProperty.PeerNotFound, 0), remoteEndPoint);
+                    {
+                        NetDebug.Write($"Unknown peer attempted to send {packet.Property} with {packet.Data.Count} bytes of data.");
+                        await SendRaw(NetworkPacket.FromProperty(PacketProperty.PeerNotFound, 0), remoteEndPoint);   
+                    }
                     break;
             }
         }
@@ -685,10 +674,10 @@ namespace Promul.Common.Networking
         /// <param name="excludePeer">The (optional) peer to exclude from receiving this information.</param>
         public async Task SendToAllAsync(ArraySegment<byte> data, DeliveryMethod options = DeliveryMethod.ReliableOrdered, byte channelNumber = 0, PromulPeer? excludePeer = null)
         {
-            for (var PromulPeer = _headPeer; PromulPeer != null; PromulPeer = PromulPeer.NextPeer)
+            for (var peer = _headPeer; peer != null; peer = peer.NextPeer)
             {
-                if (PromulPeer != excludePeer)
-                    await PromulPeer.SendAsync(data, options, channelNumber);
+                if (peer != excludePeer)
+                    await peer.SendAsync(data, options, channelNumber);
             }
         }
 
@@ -728,7 +717,7 @@ namespace Promul.Common.Networking
                         return peer;
                 }
                 //else reconnect
-                connectionNumber = (byte)((peer.ConnectionNum + 1) % NetConstants.MaxConnectionNumber);
+                connectionNumber = (byte)((peer.ConnectionNumber + 1) % NetConstants.MaxConnectionNumber);
                 RemovePeer(peer);
             }
 
@@ -746,33 +735,24 @@ namespace Promul.Common.Networking
         /// <param name="sendDisconnectMessages">Whether to notify peers of pending disconnection.</param>
         public async Task StopAsync(bool sendDisconnectMessages = true)
         {
-            NetDebug.Write("[NM] Stop");
+            NetDebug.Write("[Control] Stopping.");
 
 #if UNITY_2018_3_OR_NEWER
             _pausedSocketFix.Deinitialize();
             _pausedSocketFix = null;
 #endif
 
-            //Send last disconnect
-            for(var PromulPeer = _headPeer; PromulPeer != null; PromulPeer = PromulPeer.NextPeer)
-                await PromulPeer.ShutdownAsync(null, !sendDisconnectMessages);
+            // Disconnect all peers
+            for (var peer = _headPeer; peer != null; peer = peer.NextPeer) await peer.ShutdownAsync(null, !sendDisconnectMessages);
 
-            //Stop
             CloseSocket();
             
-
-            //clear peers
-//             _peersLock.EnterWriteLock();
-             _headPeer = null;
-//             _peersDict.Clear();
-             _peersArray = new PromulPeer[32];
-//             _peersLock.ExitWriteLock();
+            _headPeer = null;
+            _peers.Clear();
+            _peersArray = new PromulPeer[32];
             _peerIds = new ConcurrentQueue<int>();
             _lastPeerId = 0;
-#if DEBUG
-            lock (_pingSimulationList)
-                _pingSimulationList.Clear();
-#endif
+            _pingSimulationList.Clear();
             _connectedPeersCount = 0;
         }
 
@@ -784,9 +764,9 @@ namespace Promul.Common.Networking
         public int GetNumberOfPeersInState(ConnectionState peerState)
         {
             int count = 0;
-            for (var PromulPeer = _headPeer; PromulPeer != null; PromulPeer = PromulPeer.NextPeer)
+            for (var peer = _headPeer; peer != null; peer = peer.NextPeer)
             {
-                if ((PromulPeer.ConnectionState & peerState) != 0)
+                if ((peer.ConnectionState & peerState) != 0)
                     count++;
             }
             return count;
@@ -800,10 +780,10 @@ namespace Promul.Common.Networking
         public void CopyPeersIntoList(List<PromulPeer> peers, ConnectionState peerState)
         {
             peers.Clear();
-            for (var PromulPeer = _headPeer; PromulPeer != null; PromulPeer = PromulPeer.NextPeer)
+            for (var peer = _headPeer; peer != null; peer = peer.NextPeer)
             {
-                if ((PromulPeer.ConnectionState & peerState) != 0)
-                    peers.Add(PromulPeer);
+                if ((peer.ConnectionState & peerState) != 0)
+                    peers.Add(peer);
             }
         }
 
@@ -815,9 +795,9 @@ namespace Promul.Common.Networking
         public async Task DisconnectAllPeersAsync(ArraySegment<byte> data = default)
         {
             //Send disconnect packets
-            for (var PromulPeer = _headPeer; PromulPeer != null; PromulPeer = PromulPeer.NextPeer)
+            for (var peer = _headPeer; peer != null; peer = peer.NextPeer)
             {
-                await DisconnectPeerAsync(PromulPeer, data);
+                await DisconnectPeerAsync(peer, data);
             }
         }
 
@@ -837,12 +817,18 @@ namespace Promul.Common.Networking
                 data,
                 null);
         }
-        
+
         /// <summary>
         ///     Immediately disconnects a given peer without providing them with additional data.
         /// </summary>
         /// <param name="peer">The peer to disconnect.</param>
-        public Task ForceDisconnectPeerAsync(PromulPeer peer, DisconnectReason reason = DisconnectReason.DisconnectPeerCalled, SocketError errorCode = 0, NetworkPacket? data = null)
+        /// <param name="reason">The reason for disconnection.</param>
+        /// <param name="errorCode">The socket error code.</param>
+        /// <param name="data"></param>
+        public Task ForceDisconnectPeerAsync(PromulPeer peer, 
+            DisconnectReason reason = DisconnectReason.DisconnectPeerCalled,
+            SocketError errorCode = 0, 
+            NetworkPacket? data = null)
         {
             return DisconnectPeerInternalAsync(peer, reason, errorCode, true, null, data);
         }
@@ -869,7 +855,7 @@ namespace Promul.Common.Networking
             }
             if (OnPeerDisconnected != null) await OnPeerDisconnected(peer, new DisconnectInfo { Reason = reason, 
                 SocketErrorCode = socketErrorCode,
-                AdditionalData = eventData.CreateReader(eventData?.GetHeaderSize() ?? 0) });
+                AdditionalData = eventData?.CreateReader(eventData?.GetHeaderSize() ?? 0) });
         }
         
         /// <summary>
@@ -879,7 +865,7 @@ namespace Promul.Common.Networking
         /// <param name="port">The port of the desired NTP server, or, the default NTP port (123).</param>
         public void CreateNtpRequest(string ntpServerAddress, int port = NtpRequest.DefaultPort)
         {
-            IPEndPoint endPoint = NetUtils.MakeEndPoint(ntpServerAddress, NtpRequest.DefaultPort);
+            var endPoint = NetUtils.MakeEndPoint(ntpServerAddress, NtpRequest.DefaultPort);
             _ntpRequests.TryAdd(endPoint, new NtpRequest(endPoint));
         }
     }

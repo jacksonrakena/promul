@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Net;
 
 namespace Promul.Common.Networking.Packets.Internal
@@ -27,7 +28,7 @@ namespace Promul.Common.Networking.Packets.Internal
             return BitConverter.ToInt32(packet.Data[1..]);
         }
 
-        public static NetConnectRequestPacket FromData(NetworkPacket packet)
+        public static NetConnectRequestPacket? FromData(NetworkPacket packet)
         {
             if (packet.ConnectionNumber >= NetConstants.MaxConnectionNumber)
                 return null;
@@ -47,17 +48,17 @@ namespace Promul.Common.Networking.Packets.Internal
 
             // Read data and create request
             BinaryReader? reader = null;
-            if (packet.Data.Count > HeaderSize+addrSize)
-                reader = new BinaryReader(new MemoryStream(packet.Data.Array, packet.Data.Offset + HeaderSize + addrSize, packet.Data.Count));
+            if (packet.Data.Count > HeaderSize + addrSize)
+                reader = new BinaryReader(new MemoryStream(packet.Data.Array,
+                    packet.Data.Offset + HeaderSize + addrSize, packet.Data.Count));
+            else reader = new BinaryReader(new MemoryStream());
 
             return new NetConnectRequestPacket(connectionTime, packet.ConnectionNumber, peerId, addressBytes, reader);
         }
-
-        public static NetworkPacket? Make(ArraySegment<byte> connectData, SocketAddress addressBytes, long connectTime, int localId)
+        public static NetworkPacket Make(ArraySegment<byte> connectData, SocketAddress addressBytes, long connectTime, int localId)
         {
             //Make initial packet
             var packet = NetworkPacket.FromProperty(PacketProperty.ConnectRequest, connectData.Count + addressBytes.Size);
-   
             //Add data
             FastBitConverter.GetBytes(packet.Data.Array, packet.Data.Offset+1, NetConstants.ProtocolId);
             FastBitConverter.GetBytes(packet.Data.Array, packet.Data.Offset+5, connectTime);

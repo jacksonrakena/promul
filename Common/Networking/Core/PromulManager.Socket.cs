@@ -16,10 +16,6 @@ namespace Promul.Common.Networking
 #if UNITY_2018_3_OR_NEWER
         private Promul.Common.Networking.PausedSocketFix _pausedSocketFix;
 #endif
-
-#if !LITENETLIB_UNSAFE
-#endif
-
         private const int SioUdpConnreset = -1744830452; //SIO_UDP_CONNRESET = IOC_IN | IOC_VENDOR | 12
         private static readonly IPAddress MulticastAddressV6 = IPAddress.Parse("ff02::1");
         public static readonly bool IPv6Support;
@@ -84,9 +80,9 @@ namespace Promul.Common.Networking
         
         private async Task ReceiveInternalAsync(Socket s, EndPoint bufferEndPoint, CancellationToken ct = default)
         {
-            var receivebuf = new byte[NetConstants.MaxPacketSize];
-            var receive = await s.ReceiveFromAsync(receivebuf, SocketFlags.None, bufferEndPoint);
-            var packet = NetworkPacket.FromBuffer(new ArraySegment<byte>(receivebuf, 0, receive.ReceivedBytes));
+            var receiveBuffer = new byte[NetConstants.MaxPacketSize];
+            var receive = await s.ReceiveFromAsync(receiveBuffer, SocketFlags.None, bufferEndPoint);
+            var packet = NetworkPacket.FromBuffer(new ArraySegment<byte>(receiveBuffer, 0, receive.ReceivedBytes));
             await OnMessageReceived(packet, (IPEndPoint) receive.RemoteEndPoint);
         }
 
@@ -293,7 +289,7 @@ namespace Promul.Common.Networking
             NetworkPacket? expandedPacket = null;
             if (_extraPacketLayer != null)
             {
-                expandedPacket = NetworkPacket.Empty(data.Count + _extraPacketLayer.ExtraPacketSizeForLayer);
+                expandedPacket = NetworkPacket.FromBuffer(new byte[data.Count + _extraPacketLayer.ExtraPacketSizeForLayer]);
                 
                 data.CopyTo(expandedPacket.Data.Array, expandedPacket.Data.Offset);
 
@@ -382,9 +378,8 @@ namespace Promul.Common.Networking
             if (_extraPacketLayer != null)
             {
                 var headerSize = NetworkPacket.GetHeaderSize(PacketProperty.Broadcast);
-                packet = NetworkPacket.Empty(headerSize + data.Count + _extraPacketLayer.ExtraPacketSizeForLayer);
+                packet = NetworkPacket.FromProperty(PacketProperty.Broadcast, data.Count + _extraPacketLayer.ExtraPacketSizeForLayer);
                 
-                packet.Property = PacketProperty.Broadcast;
                 data.CopyTo(packet.Data.Array, packet.Data.Offset+headerSize);
                 //Buffer.BlockCopy(data.Array, data.Offset, packet.Data, headerSize, data.Count);
                 var checksumComputeStart = 0;

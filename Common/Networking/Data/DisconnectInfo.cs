@@ -21,6 +21,11 @@ namespace Promul.Common.Networking.Data
         /// <summary>
         /// Additional data that can be accessed (only if reason is RemoteConnectionClose)
         /// </summary>
-        public BinaryReader AdditionalData;
+        public BinaryReader? AdditionalData;
+
+        public override string ToString()
+        {
+            return $"{Reason:G} ({SocketErrorCode:G})";
+        }
     }
 }

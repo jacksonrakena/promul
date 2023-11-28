@@ -1,11 +1,13 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using Promul.Common.Networking.Packets.Internal;
 
 namespace Promul.Common.Networking.Packets
 {
     public enum PacketProperty : byte
     {
+        Unknown,
         Unreliable,
         Channeled,
         Ack,
@@ -21,9 +23,7 @@ namespace Promul.Common.Networking.Packets
         Merged,
         ShutdownOk,
         PeerNotFound,
-        InvalidProtocol,
-        NatMessage,
-        Empty
+        InvalidProtocol
     }
 
     public class NetworkPacket
@@ -122,15 +122,14 @@ namespace Promul.Common.Networking.Packets
         //Data
         public ArraySegment<byte> Data { get; }
 
-        private NetworkPacket(ArraySegment<byte> data, PacketProperty property = default)
+        private NetworkPacket(ArraySegment<byte> data)
+        {
+            Data = data;
+        }
+        private NetworkPacket(ArraySegment<byte> data, PacketProperty property)
         {
             Data = data;
             Property = property;
-        }
-
-        public static NetworkPacket Empty(int size)
-        {
-            return new NetworkPacket(new byte[size]);
         }
 
         public static NetworkPacket FromBuffer(ArraySegment<byte> data)

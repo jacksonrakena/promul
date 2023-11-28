@@ -15,7 +15,7 @@ namespace Promul.Common.Networking
         public delegate Task ConnectionlessReceiveEvent(IPEndPoint remoteEndPoint, BinaryReader reader, UnconnectedMessageType messageType);
         public delegate Task NetworkLatencyUpdateEvent(PromulPeer peer, int latency);
         public delegate Task ConnectionRequestEvent(ConnectionRequest request);
-        public delegate Task DeliveryEvent(PromulPeer peer, object userData);
+        public delegate Task DeliveryEvent(PromulPeer peer, object? userData);
         public delegate Task NtpResponseEvent(NtpPacket packet);
         public delegate Task PeerAddressChangedEvent(PromulPeer peer, IPEndPoint previousAddress);
         

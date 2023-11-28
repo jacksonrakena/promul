@@ -18,7 +18,7 @@ namespace Promul.Common.Networking.Packets.Internal
             PeerNetworkChanged = peerNetworkChanged;
         }
 
-        public static NetConnectAcceptPacket FromData(NetworkPacket packet)
+        public static NetConnectAcceptPacket? FromData(NetworkPacket packet)
         {
             if (packet.Data.Count != Size)
                 return null;
@@ -56,7 +56,7 @@ namespace Promul.Common.Networking.Packets.Internal
         {
             var packet = NetworkPacket.FromProperty(PacketProperty.PeerNotFound, Size - 1);
             FastBitConverter.GetBytes(packet.Data.Array, packet.Data.Offset+1, peer.ConnectTime);
-            packet.Data.Array[packet.Data.Offset+9] = peer.ConnectionNum;
+            packet.Data.Array[packet.Data.Offset+9] = peer.ConnectionNumber;
             packet.Data.Array[packet.Data.Offset+10] = 1;
             FastBitConverter.GetBytes(packet.Data.Array, packet.Data.Offset+11, peer.RemoteId);
             return packet;
