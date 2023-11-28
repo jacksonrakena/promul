@@ -1,4 +1,5 @@
 ﻿using Promul.Common.Networking;
+using Promul.Common.Networking.Data;
 using Promul.Common.Structs;
 namespace Promul.Server.Relay.Sessions;
 
@@ -33,7 +34,7 @@ public class RelaySession
         {
             case RelayControlMessageType.Data:
                 Console.WriteLine($"{from.Id} requesting to send {message.Data.Count} bytes of data to {message.AuthorClientId}");
-                Send(dest, new RelayControlMessage { Type = RelayControlMessageType.Data, AuthorClientId = (ulong)from.Id, Data = message.Data }, method);
+                await SendAsync(dest, new RelayControlMessage { Type = RelayControlMessageType.Data, AuthorClientId = (ulong)from.Id, Data = message.Data }, method);
                 break;
             case RelayControlMessageType.KickFromRelay:
                 var target = message.AuthorClientId;
@@ -57,15 +58,15 @@ public class RelaySession
 
     }
 
-    private void Send(PromulPeer to, RelayControlMessage message, DeliveryMethod method)
+    private async Task SendAsync(PromulPeer to, RelayControlMessage message, DeliveryMethod method)
     {
-        var writer = new BinaryWriter(new MemoryStream());
+        var writer = CompositeWriter.Create();
         writer.Write(message);
         _logger.LogInformation($"Sending {message.Type} from {message.AuthorClientId} to {to.Id}");
-        to.Send(writer, deliveryMethod: method);
+        await to.SendAsync(writer, deliveryMethod: method);
     }
 
-    public void OnJoin(PromulPeer peer)
+    public async Task OnJoinAsync(PromulPeer peer)
     {
         _connections[peer.Id] = peer;
         if (host == null)
@@ -77,14 +78,14 @@ public class RelaySession
         {
             LogInformation($"{peer.Id} has joined");
             
-            Send(HostPeer!, new RelayControlMessage()
+            await SendAsync(HostPeer!, new RelayControlMessage()
             {
                 Type = RelayControlMessageType.Connected,
                 AuthorClientId = (ulong) peer.Id,
                 Data = Array.Empty<byte>()
             }, DeliveryMethod.ReliableOrdered);
             
-            Send(peer, new RelayControlMessage
+            await SendAsync(peer, new RelayControlMessage
             {
                 Type = RelayControlMessageType.Connected,
                 AuthorClientId = (ulong) host!,
@@ -108,7 +109,7 @@ public class RelaySession
             }
             if (host != null)
             {
-                Send(HostPeer!, new RelayControlMessage
+                await SendAsync(HostPeer!, new RelayControlMessage
                 {
                     Type = RelayControlMessageType.Disconnected,
                     AuthorClientId = (ulong) peer.Id,

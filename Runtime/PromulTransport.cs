@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Concurrent;
+using System.IO;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Promul.Common.Networking;
 using Promul.Common.Networking.Data;
 using Promul.Common.Structs;
+using Unity.Netcode;
+using UnityEngine;
 
 namespace Promul.Runtime
 {
@@ -64,24 +67,27 @@ namespace Promul.Runtime
         PromulPeer? _relayPeer;
         CancellationTokenSource _cts = new CancellationTokenSource();
 
-        public void SendControl(RelayControlMessage rcm, NetworkDelivery qos)
+        public async Task SendControl(RelayControlMessage rcm, NetworkDelivery qos)
         {
-            var writer = new NetDataWriter();
-            writer.Put(rcm);
-            _relayPeer?.Send(writer, ConvertNetworkDelivery(qos));
+            var writer = CompositeWriter.Create();
+            writer.Write(rcm);
+            if (_relayPeer != null) await _relayPeer.SendAsync(writer, ConvertNetworkDelivery(qos));
         }
         
         public override void Send(ulong clientId, ArraySegment<byte> data, NetworkDelivery qos)
         {
-            SendControl(new RelayControlMessage
+            Task.Run(async () =>
             {
-                Type = RelayControlMessageType.Data,
-                AuthorClientId = clientId,
-                Data = data
-            }, qos);
+                await SendControl(new RelayControlMessage
+                {
+                    Type = RelayControlMessageType.Data,
+                    AuthorClientId = clientId,
+                    Data = data
+                }, qos);
+            });
         }
 
-        async Task OnNetworkReceive(PromulPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod)
+        async Task OnNetworkReceive(PromulPeer peer, BinaryReader reader, byte channel, DeliveryMethod deliveryMethod)
         {
             var message = reader.ReadRelayControlMessage();
             var author = message.AuthorClientId;
@@ -112,8 +118,6 @@ namespace Promul.Runtime
                     Debug.LogError("Ignoring Promul control byte " + message.Type);
                     break;
             }
-
-            reader.Recycle();
         }
 
         public override NetworkEvent PollEvent(out ulong clientId, out ArraySegment<byte> payload, out float receiveTime)
@@ -136,9 +140,9 @@ namespace Promul.Runtime
             _ = Task.Run(async () =>
             {
                 _mPromulManager.Bind(IPAddress.Any, IPAddress.None, 0);
-                var joinPacket = new NetDataWriter();
-                joinPacket.Put(joinCode);
-                _relayPeer = await _mPromulManager.ConnectAsync(NetUtils.MakeEndPoint(Address, Port), joinPacket);
+                var ms = CompositeWriter.Create();
+                ms.Write(joinCode);
+                _relayPeer = await _mPromulManager.ConnectAsync(NetUtils.MakeEndPoint(Address, Port), ms);
                 await _mPromulManager.ListenAsync(_cts.Token);
             }, _cts.Token);
             return true;

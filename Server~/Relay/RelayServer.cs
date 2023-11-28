@@ -79,7 +79,7 @@ public class RelayServer
         }
 
         var peer = await request.AcceptAsync();
-        keyedSession.OnJoin(peer);
+        await keyedSession.OnJoinAsync(peer);
         _sessionsByPeer[peer.Id] = keyedSession;
     }
     
