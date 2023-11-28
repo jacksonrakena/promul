@@ -752,7 +752,9 @@ namespace Promul.Common.Networking
             _peersArray = new PromulPeer[32];
             _peerIds = new ConcurrentQueue<int>();
             _lastPeerId = 0;
+#if DEBUG
             _pingSimulationList.Clear();
+#endif
             _connectedPeersCount = 0;
         }
 

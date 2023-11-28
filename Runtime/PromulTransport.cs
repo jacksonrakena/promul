@@ -114,6 +114,7 @@ namespace Promul.Runtime
                         break;
                 }
                 case RelayControlMessageType.KickFromRelay:
+                    break;
                 default:
                     Debug.LogError("Ignoring Promul control byte " + message.Type);
                     break;
@@ -190,7 +191,7 @@ namespace Promul.Runtime
             m_HostType = HostType.None;
         }
 
-        public override void Initialize(NetworkManager networkManager = null)
+        public override void Initialize(NetworkManager? networkManager = null)
         {
             _mPromulManager = new PromulManager
             {
