@@ -9,6 +9,7 @@ namespace Promul.Common.Networking.Channels
     {
         protected readonly PromulPeer Peer;
         protected readonly Queue<NetworkPacket> OutgoingQueue = new(NetConstants.DefaultWindowSize);
+        protected SemaphoreSlim outgoingQueueSem = new SemaphoreSlim(1, 1);
         private int _isAddedToPeerChannelSendQueue;
 
         public int PacketsInQueue => OutgoingQueue.Count;
@@ -18,12 +19,13 @@ namespace Promul.Common.Networking.Channels
             Peer = peer;
         }
 
-        public void EnqueuePacket(NetworkPacket packet)
+        public async Task EnqueuePacketAsync(NetworkPacket packet)
         {
-            lock (OutgoingQueue)
-            {
-                OutgoingQueue.Enqueue(packet);
-            }
+            await outgoingQueueSem.WaitAsync();
+            
+            OutgoingQueue.Enqueue(packet);
+            
+            outgoingQueueSem.Release();
             AddToPeerChannelSendQueue();
         }
 

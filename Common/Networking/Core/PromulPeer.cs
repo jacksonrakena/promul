@@ -426,31 +426,12 @@ namespace Promul.Common.Networking
         ///     - The size of <see cref="data"/> exceeds <see cref="GetUserMaximumTransmissionUnit"/> if <see cref="DeliveryMethod"/> is <see cref="DeliveryMethod.Unreliable"/>.<br />
         ///     - The number of computed fragments exceeds <see cref="ushort.MaxValue"/>.
         /// </exception>
-        public void Send(ArraySegment<byte> data, DeliveryMethod deliveryMethod = DeliveryMethod.ReliableOrdered, byte channelNumber = 0)
+        public Task SendAsync(ArraySegment<byte> data, DeliveryMethod deliveryMethod = DeliveryMethod.ReliableOrdered, byte channelNumber = 0)
         {
-            SendInternal(data, channelNumber, deliveryMethod);
+            return SendInternal(data, channelNumber, deliveryMethod);
         }
 
-        /// <summary>
-        ///     Sends a data stream to the remote peer. This method will queue the data in the correct
-        ///     delivery channel, so completion of this method does NOT indicate completion of the
-        ///     sending process.
-        /// </summary>
-        /// <param name="writer">The data to transmit.</param>
-        /// <param name="channelNumber">The number of channel to send on.</param>
-        /// <param name="deliveryMethod">The delivery method to send the data.</param>
-        /// <exception cref="TooBigPacketException">
-        ///     Thrown in the following instances:<br />
-        ///     - The size of <see cref="writer"/> exceeds <see cref="GetUserMaximumTransmissionUnit"/> if <see cref="DeliveryMethod"/> is <see cref="DeliveryMethod.Unreliable"/>.<br />
-        ///     - The number of computed fragments exceeds <see cref="ushort.MaxValue"/>.
-        /// </exception>
-        public void Send(BinaryWriter writer, DeliveryMethod deliveryMethod = DeliveryMethod.ReliableOrdered,
-            byte channelNumber = 0)
-        {
-            Send(new BinaryReader(writer.BaseStream).ReadBytes(int.MaxValue), deliveryMethod, channelNumber);
-        }
-
-        private void SendInternal(
+        private async Task SendInternal(
             ArraySegment<byte> data,
             byte channelNumber,
             DeliveryMethod deliveryMethod)
@@ -514,7 +495,7 @@ namespace Promul.Common.Networking
                     p.MarkFragmented();
 
                     if (data.Array != null) Buffer.BlockCopy(data.Array, data.Offset + partIdx * packetDataSize, p.Data.Array,p.Data.Offset+NetConstants.FragmentedHeaderTotalSize, sendLength);
-                    channel?.EnqueuePacket(p);
+                    if (channel != null) await channel.EnqueuePacketAsync(p);
 
                     length -= sendLength;
                 }
@@ -535,7 +516,7 @@ namespace Promul.Common.Networking
             }
             else
             {
-                channel.EnqueuePacket(packet);
+                await channel.EnqueuePacketAsync(packet);
             }
         }
 

@@ -683,12 +683,12 @@ namespace Promul.Common.Networking
         /// <param name="channelNumber">The channel number. This can range from 0 to <see cref="ChannelsCount"/> - 1.</param>
         /// <param name="options">The delivery method to utilise.</param>
         /// <param name="excludePeer">The (optional) peer to exclude from receiving this information.</param>
-        public void SendToAll(ArraySegment<byte> data, DeliveryMethod options = DeliveryMethod.ReliableOrdered, byte channelNumber = 0, PromulPeer? excludePeer = null)
+        public async Task SendToAllAsync(ArraySegment<byte> data, DeliveryMethod options = DeliveryMethod.ReliableOrdered, byte channelNumber = 0, PromulPeer? excludePeer = null)
         {
             for (var PromulPeer = _headPeer; PromulPeer != null; PromulPeer = PromulPeer.NextPeer)
             {
                 if (PromulPeer != excludePeer)
-                    PromulPeer.Send(data, options, channelNumber);
+                    await PromulPeer.SendAsync(data, options, channelNumber);
             }
         }
 
