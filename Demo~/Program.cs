@@ -1,6 +1,8 @@
 using System.Net;
+using System.Text;
 using Promul.Common.Networking;
 using Promul.Common.Networking.Data;
+using Terminal.Gui;
 
 public enum State
 {
@@ -10,35 +12,112 @@ public enum State
     Connected
 }
 
-public class Program
+public class Program : Window
 {
     private State state = State.Disconnected;
     private PromulManager manager = new PromulManager();
     private CancellationTokenSource cts = new CancellationTokenSource();
-    public void PrintStatus()
+
+    public void WriteLog(string output)
     {
-        Console.WriteLine("Connected to: " + string.Join(",", manager.ConnectedPeerList.Select(e => $"{e.Id} ({e.EndPoint})")));
+        logLabel.Text += output + Environment.NewLine;
+    }
+
+    public void WriteMessage(string msg)
+    {
+        mLabel.Text += (msg + Environment.NewLine);
+    }
+
+    public Label mLabel;
+    public Label logLabel;
+    public bool started;
+    public Program ()
+    {
+        Title = "Example App (Ctrl+Q to quit)";
+
+        var messages = new FrameView("Messages")
+        {
+            Width = Dim.Percent(50),
+            Height = Dim.Percent(90)
+        };
+        mLabel = new Label()
+        {
+            Width = Dim.Fill(),
+            Height = Dim.Fill()
+        };
+        messages.Add(mLabel);
+        var log = new FrameView("Log")
+        {
+            Width = Dim.Percent(50),
+            Height = Dim.Percent(90),
+            X = Pos.Right(messages)
+        };
+        logLabel = new Label() { Width = Dim.Fill(), Height = Dim.Fill() };
+        log.Add(logLabel);
+        var inputFrame = new FrameView("Input")
+        {
+            Width = Dim.Fill(),
+            Height = Dim.Percent(10),
+            Y = Pos.Bottom(messages)
+        };
+        var input = new TextField("")
+        {
+            Width = Dim.Fill(),
+            Height = Dim.Fill()
+        };
+        input.KeyPress += args =>
+        {
+            Task.Run(async () =>
+            {
+                if (!started && args.KeyEvent.Key == Key.Enter)
+                {
+                    started = true;
+                    await Process(input.Text.ToString());
+                    input.Clear();
+                }
+            });
+        };
+        inputFrame.Add(input);
+        Add(messages,log, inputFrame);
+        
+        NetDebug.Logger
+        Console.SetOut(new RedirectedWriter(logLabel));
+    }
+
+    class RedirectedWriter : TextWriter
+    {
+        private readonly Label _output;
+        public RedirectedWriter(Label output)
+        {
+            _output = output;
+        }
+
+        public override Encoding Encoding => Encoding.Default;
+        public override void Write(char value)
+        {
+            _output.Text += value.ToString();
+        }
     }
 
     public void StartCommon()
     {
         manager.Ipv6Enabled = false;
-        manager.OnPeerConnected += async peer => Console.WriteLine("Connected to " + peer.Id);
-        manager.OnPeerDisconnected += async (peer, reason) => Console.WriteLine("Disconnected from " + peer.Id + ": " + reason);
-        manager.OnNetworkError += async (ep, err) => Console.WriteLine("Error on " + ep + ": " + err);
+        manager.OnPeerConnected += async peer => WriteMessage("Connected to " + peer.Id);
+        manager.OnPeerDisconnected += async (peer, reason) => WriteMessage("Disconnected from " + peer.Id + ": " + reason);
+        manager.OnNetworkError += async (ep, err) => WriteMessage("Error on " + ep + ": " + err);
         manager.OnConnectionRequest += async req =>
         {
-            Console.WriteLine("Request from " + req.RemoteEndPoint + ", accepting");
+            WriteMessage("Request from " + req.RemoteEndPoint + ", accepting");
             await req.AcceptAsync();
         };
         manager.ConnectionlessMessagesAllowed = true;
         manager.OnConnectionlessReceive +=
-            async (point, reader, type) => Console.WriteLine($"Connectionless receive from " + point);
+            async (point, reader, type) => WriteMessage($"Connectionless receive from " + point);
         manager.OnReceive += async (p, m, ch, dm) =>
         {
             var str = m.ReadString();
             //var data = m.ReadBytes(int.MaxValue);
-            Console.WriteLine("Received data from " + p.Id + ": " +
+            WriteMessage(p.Id + ": " +
                               /*string.Join(" ", data.Select(e => e.ToString("X"))*/str);
         };
 
@@ -55,45 +134,37 @@ public class Program
         StartCommon();
         manager.Bind(IPAddress.Any, IPAddress.Any, 0);
         var peer = await manager.ConnectAsync(NetUtils.MakeEndPoint("127.0.0.1", port), Array.Empty<byte>());
-        Console.WriteLine($"Connected to {peer.Id} ({peer.EndPoint})");
+        WriteMessage($"Connected to {peer.Id} ({peer.EndPoint})");
         _ = manager.ListenAsync(cts.Token);
     }
 
-    public async Task Start()
+    public async Task Process(string input)
     {
-        while (!cts.IsCancellationRequested)
+        if (input.StartsWith("host"))
         {
-            PrintStatus();
-            Console.Write("Your request: ");
-    
-            string? input = null;
-            while (string.IsNullOrWhiteSpace(input)) input = Console.ReadLine();
-            if (input.StartsWith("host"))
-            {
-                var port = int.Parse(input.Replace("host ", ""));
-                await StartHost(port);
-                Console.WriteLine("Host started on " + port);
-            }
+            var port = int.Parse(input.Replace("host ", ""));
+            await StartHost(port);
+            mLabel.Text += "Host started on " + port;
+        }
 
-            if (input.StartsWith("client"))
-            {
-                var port = int.Parse(input.Replace("client ", ""));
-                await StartClient(port);
-            }
+        if (input.StartsWith("client"))
+        {
+            var port = int.Parse(input.Replace("client ", ""));
+            await StartClient(port);
+        }
 
-            if (input.StartsWith("send"))
-            {
-                var parts = input.Replace("send ", "").Split(" ");
-                var dest = int.Parse(parts[0]);
-                var msg = parts[1];
-                var wr = CompositeWriter.Create();
-                wr.Write(msg);
-                await manager.ConnectedPeerList.First(e => e.Id == dest).SendAsync(wr, DeliveryMethod.ReliableOrdered);
-            }
+        if (input.StartsWith("send"))
+        {
+            var parts = input.Replace("send ", "").Split(" ");
+            var dest = int.Parse(parts[0]);
+            var msg = parts[1];
+            var wr = CompositeWriter.Create();
+            wr.Write(msg);
+            await manager.ConnectedPeerList.First(e => e.Id == dest).SendAsync(wr, DeliveryMethod.ReliableOrdered);
         }
     }
     public static async Task Main(string[] args)
     {
-        await new Program().Start();
+        Application.Run<Program>();
     }
 }

@@ -8,16 +8,16 @@ namespace Promul.Common.Networking
 {
     public partial class PromulManager
     {
-        public delegate Task PeerConnectedEvent(PromulPeer peer);
-        public delegate Task PeerDisconnectedEvent(PromulPeer peer, DisconnectInfo disconnectInfo);
+        public delegate Task PeerConnectedEvent(PeerBase peer);
+        public delegate Task PeerDisconnectedEvent(PeerBase peer, DisconnectInfo disconnectInfo);
         public delegate Task NetworkErrorEvent(IPEndPoint endPoint, SocketError socketError);
-        public delegate Task NetworkReceiveEvent(PromulPeer peer, CompositeReader reader, byte channel, DeliveryMethod deliveryMethod);
+        public delegate Task NetworkReceiveEvent(PeerBase peer, CompositeReader reader, byte channel, DeliveryMethod deliveryMethod);
         public delegate Task ConnectionlessReceiveEvent(IPEndPoint remoteEndPoint, CompositeReader reader, UnconnectedMessageType messageType);
-        public delegate Task NetworkLatencyUpdateEvent(PromulPeer peer, int latency);
+        public delegate Task NetworkLatencyUpdateEvent(PeerBase peer, int latency);
         public delegate Task ConnectionRequestEvent(ConnectionRequest request);
-        public delegate Task DeliveryEvent(PromulPeer peer, object? userData);
+        public delegate Task DeliveryEvent(PeerBase peer, object? userData);
         public delegate Task NtpResponseEvent(NtpPacket packet);
-        public delegate Task PeerAddressChangedEvent(PromulPeer peer, IPEndPoint previousAddress);
+        public delegate Task PeerAddressChangedEvent(PeerBase peer, IPEndPoint previousAddress);
         
         /// <summary>
         ///     Invoked when a connection is made with a remote peer.

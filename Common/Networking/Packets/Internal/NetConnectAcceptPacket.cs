@@ -2,19 +2,15 @@ using System;
 
 namespace Promul.Common.Networking.Packets.Internal
 {
-    internal sealed class NetConnectAcceptPacket
+    internal sealed class NetConnectAcceptPacket : ConnectPacketBase
     {
         public const int Size = 15;
-        public readonly long ConnectionTime;
-        public readonly byte ConnectionNumber;
         public readonly int PeerId;
         public readonly bool PeerNetworkChanged;
 
         private NetConnectAcceptPacket(long connectionTime, byte connectionNumber, int peerId, bool peerNetworkChanged)
+            : base(connectionTime, connectionNumber, peerId)
         {
-            ConnectionTime = connectionTime;
-            ConnectionNumber = connectionNumber;
-            PeerId = peerId;
             PeerNetworkChanged = peerNetworkChanged;
         }
 
@@ -43,7 +39,7 @@ namespace Promul.Common.Networking.Packets.Internal
             return new NetConnectAcceptPacket(connectionId, connectionNumber, peerId, isReused == 1);
         }
 
-        public static NetworkPacket? Make(long connectTime, byte connectNum, int localPeerId)
+        public static NetworkPacket Make(long connectTime, byte connectNum, int localPeerId)
         {
             var packet = NetworkPacket.FromProperty(PacketProperty.ConnectAccept, 0);
             FastBitConverter.GetBytes(packet.Data.Array, packet.Data.Offset+1, connectTime);
@@ -52,7 +48,7 @@ namespace Promul.Common.Networking.Packets.Internal
             return packet;
         }
         
-        public static NetworkPacket MakeNetworkChanged(PromulPeer peer)
+        public static NetworkPacket MakeNetworkChanged(PeerBase peer)
         {
             var packet = NetworkPacket.FromProperty(PacketProperty.PeerNotFound, Size - 1);
             FastBitConverter.GetBytes(packet.Data.Array, packet.Data.Offset+1, peer.ConnectTime);

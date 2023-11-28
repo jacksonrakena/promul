@@ -16,7 +16,7 @@ namespace Promul.Common.Networking.Channels
         private readonly byte _id;
         private long _lastPacketSendTime;
 
-        public SequencedChannel(PromulPeer peer, bool reliable, byte id) : base(peer)
+        public SequencedChannel(PeerBase peer, bool reliable, byte id) : base(peer)
         {
             _id = id;
             _reliable = reliable;

@@ -25,7 +25,7 @@ namespace Promul.Common.Networking.Channels
             }
 
             //Returns true if there is a pending packet inside
-            public async Task<bool> TrySendAsync(long currentTime, PromulPeer peer)
+            public async Task<bool> TrySendAsync(long currentTime, PeerBase peer)
             {
                 if (_packet == null)
                     return false;
@@ -43,7 +43,7 @@ namespace Promul.Common.Networking.Channels
                 return true;
             }
 
-            public async Task<bool> ClearAsync(PromulPeer peer)
+            public async Task<bool> ClearAsync(PeerBase peer)
             {
                 if (_packet != null)
                 {
@@ -73,7 +73,7 @@ namespace Promul.Common.Networking.Channels
         private const int BitsInByte = 8;
         private readonly byte _id;
 
-        public ReliableChannel(PromulPeer peer, bool ordered, byte id) : base(peer)
+        public ReliableChannel(PeerBase peer, bool ordered, byte id) : base(peer)
         {
             _id = id;
             _windowSize = NetConstants.DefaultWindowSize;

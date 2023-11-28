@@ -2,25 +2,21 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Net;
+using Promul.Common.Networking.Data;
 
 namespace Promul.Common.Networking.Packets.Internal
 {
-    internal sealed class NetConnectRequestPacket
+    internal sealed class NetConnectRequestPacket : ConnectPacketBase
     {
         public const int HeaderSize = 18;
-        public readonly long ConnectionTime;
-        public byte ConnectionNumber;
         public readonly byte[] TargetAddress;
-        public readonly BinaryReader Data;
-        public readonly int PeerId;
+        public readonly CompositeReader Data;
 
-        private NetConnectRequestPacket(long connectionTime, byte connectionNumber, int localId, byte[] targetAddress, BinaryReader data)
-        {
-            ConnectionTime = connectionTime;
-            ConnectionNumber = connectionNumber;
+        private NetConnectRequestPacket(long connectionTime, byte connectionNumber, int localId, byte[] targetAddress, CompositeReader data)
+            : base (connectionTime, connectionNumber, localId)
+        { 
             TargetAddress = targetAddress;
             Data = data;
-            PeerId = localId;
         }
 
         public static int GetProtocolId(NetworkPacket packet)
@@ -47,11 +43,11 @@ namespace Promul.Common.Networking.Packets.Internal
             Buffer.BlockCopy(packet.Data.Array, packet.Data.Offset+HeaderSize, addressBytes, 0, addrSize);
 
             // Read data and create request
-            BinaryReader? reader = null;
+            CompositeReader reader;
             if (packet.Data.Count > HeaderSize + addrSize)
-                reader = new BinaryReader(new MemoryStream(packet.Data.Array,
-                    packet.Data.Offset + HeaderSize + addrSize, packet.Data.Count));
-            else reader = new BinaryReader(new MemoryStream());
+                reader = CompositeReader.Create(new ArraySegment<byte>(packet.Data.Array,
+                    packet.Data.Offset + HeaderSize + addrSize, packet.Data.Count - HeaderSize - addrSize));
+            else reader = CompositeReader.Create(Array.Empty<byte>());
 
             return new NetConnectRequestPacket(connectionTime, packet.ConnectionNumber, peerId, addressBytes, reader);
         }

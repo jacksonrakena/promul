@@ -8,14 +8,14 @@ namespace Promul.Common.Networking.Channels
 {
     internal abstract class ChannelBase
     {
-        protected readonly PromulPeer Peer;
+        protected readonly PeerBase Peer;
         protected readonly Queue<NetworkPacket> OutgoingQueue = new(NetConstants.DefaultWindowSize);
         protected SemaphoreSlim outgoingQueueSem = new SemaphoreSlim(1, 1);
         private int _isAddedToPeerChannelSendQueue;
 
         public int PacketsInQueue => OutgoingQueue.Count;
 
-        protected ChannelBase(PromulPeer peer)
+        protected ChannelBase(PeerBase peer)
         {
             Peer = peer;
         }

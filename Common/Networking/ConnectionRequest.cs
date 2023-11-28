@@ -66,7 +66,7 @@ namespace Promul.Common.Networking
         /// </summary>
         /// <param name="key">The key to compare the data to.</param>
         /// <returns>Null, if the request was rejected. Otherwise, the connected peer.</returns>
-        public async Task<PromulPeer?> AcceptIfMatchesKeyAsync(string key)
+        public async Task<PeerBase?> AcceptIfMatchesKeyAsync(string key)
         {
             if (!TryActivate()) return null;
             try
@@ -90,7 +90,7 @@ namespace Promul.Common.Networking
         ///     Accepts the connection.
         /// </summary>
         /// <returns>The connected peer, or null, if the manager was unable to activate the peer.</returns>
-        public async Task<PromulPeer?> AcceptAsync()
+        public async Task<PeerBase?> AcceptAsync()
         {
             if (!TryActivate())
                 return null;

@@ -51,7 +51,7 @@ public class RelayServer
         _sessionsByCode.Remove(session.JoinCode);
     }
 
-    public async Task OnNetworkReceive(PromulPeer peer, CompositeReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
+    public async Task OnNetworkReceive(PeerBase peer, CompositeReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
         var packet = reader.ReadRelayControlMessage();
 
@@ -83,11 +83,11 @@ public class RelayServer
         _sessionsByPeer[peer.Id] = keyedSession;
     }
     
-    public async Task OnPeerConnected(PromulPeer peer)
+    public async Task OnPeerConnected(PeerBase peer)
     {
         _logger.LogInformation($"Connected to {peer.EndPoint}");
     }
-    public async Task OnPeerDisconnected(PromulPeer peer, DisconnectInfo disconnectInfo)
+    public async Task OnPeerDisconnected(PeerBase peer, DisconnectInfo disconnectInfo)
     {
         _logger.LogInformation($"Peer {peer.Id} disconnected: {disconnectInfo.Reason} {disconnectInfo.SocketErrorCode}");
         if (_sessionsByPeer.TryGetValue(peer.Id, out var session))

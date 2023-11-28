@@ -65,7 +65,7 @@ namespace Promul.Runtime
         
         public override bool IsSupported => Application.platform != RuntimePlatform.WebGLPlayer;
 
-        PromulPeer? _relayPeer;
+        PeerBase? _relayPeer;
         CancellationTokenSource _cts = new CancellationTokenSource();
 
         public async Task SendControl(RelayControlMessage rcm, NetworkDelivery qos)
@@ -89,7 +89,7 @@ namespace Promul.Runtime
             });
         }
 
-        async Task OnNetworkReceive(PromulPeer peer, CompositeReader reader, byte channel, DeliveryMethod deliveryMethod)
+        async Task OnNetworkReceive(PeerBase peer, CompositeReader reader, byte channel, DeliveryMethod deliveryMethod)
         {
             var message = reader.ReadRelayControlMessage();
             var author = message.AuthorClientId;
@@ -233,7 +233,7 @@ namespace Promul.Runtime
         {
             await request.RejectAsync(force: true);
         }
-        async Task OnPeerDisconnected(PromulPeer peer, DisconnectInfo disconnectInfo)
+        async Task OnPeerDisconnected(PeerBase peer, DisconnectInfo disconnectInfo)
         {
             Debug.Log("Disconnected " + disconnectInfo.Reason.ToString() + " " + disconnectInfo.SocketErrorCode.ToString());
             if (disconnectInfo.Reason != DisconnectReason.DisconnectPeerCalled) 

@@ -286,32 +286,28 @@ namespace Promul.Common.Networking
             return true;
         }
         
-        internal async Task<int> SendRaw(ArraySegment<byte> data, IPEndPoint remoteEndPoint, CancellationToken ct = default)
+        /// <summary>
+        ///     Sends arbitrary-sized data to the destination endpoint,
+        ///     using an optional provided token.
+        ///     This method will apply any networking layers configured in <see cref="PromulManager"/>.
+        /// </summary>
+        /// <param name="data">The data to send.</param>
+        /// <param name="remoteEndPoint">The remote endpoint to send to.</param>
+        /// <param name="ct">The cancellation token used to cancel the send operation.</param>
+        /// <returns>The number of bytes sent.</returns>
+        internal async Task<int> RawSendAsync(ArraySegment<byte> data, IPEndPoint remoteEndPoint, CancellationToken ct = default)
         {
-            NetworkPacket? expandedPacket = null;
-            if (_extraPacketLayer != null)
-            {
-                expandedPacket = NetworkPacket.FromBuffer(new byte[data.Count + _extraPacketLayer.ExtraPacketSizeForLayer]);
-                
-                data.CopyTo(expandedPacket.Data.Array, expandedPacket.Data.Offset);
-
-                data = expandedPacket.Data;
-                _extraPacketLayer.ProcessOutBoundPacket(ref remoteEndPoint, ref expandedPacket);
-            }
-
             var socket = _udpSocketv4;
             if (remoteEndPoint.AddressFamily == AddressFamily.InterNetworkV6 && IPv6Support)
             {
                 socket = _udpSocketv6;
-                if (socket == null)
-                    return 0;
+                if (socket == null) return 0;
             }
 
             int result;
             try
             {
                 result = await socket.SendToAsync(data, SocketFlags.None, remoteEndPoint);
-                //NetDebug.WriteForce("[S]Send packet to {0}, result: {1}", remoteEndPoint, result);
             }
             catch (SocketException ex)
             {
@@ -353,13 +349,6 @@ namespace Promul.Common.Networking
             {
                 NetDebug.WriteError($"[S] {ex}");
                 return 0;
-            }
-            finally
-            {
-                if (expandedPacket != null)
-                {
-                    //PoolRecycle(expandedPacket);
-                }
             }
 
             if (result <= 0)

@@ -21,19 +21,19 @@ namespace Promul.Common.Networking
     /// <summary>
     ///     Represents a remote peer, managed by a given <see cref="PromulManager"/> instance.
     /// </summary>
-    public partial class PromulPeer
+    public partial class PeerBase
     {
         private int _rtt; // Current round-trip time
         private int _rttCount; // Number of times _rtt has been updated
         private long _pingSendTimer; // Milliseconds since last ping sent
         private long _rttResetTimer; // Milliseconds since last RTT reset
         private readonly Stopwatch _pingTimer = new();
-        private long _timeSinceLastPacket; // Milliseconds since last packet of any type received
+        protected long _timeSinceLastPacket; // Milliseconds since last packet of any type received
         private readonly SemaphoreSlim _shutdownSemaphore // Locks for shutdown operations
             = new SemaphoreSlim(1, 1);
         
-        internal volatile PromulPeer? NextPeer;
-        internal PromulPeer? PrevPeer;
+        internal volatile PeerBase? NextPeer;
+        internal PeerBase? PrevPeer;
 
         // Channels
         private readonly Queue<NetworkPacket> _unreliableChannel; // Unreliable packet queue
@@ -80,12 +80,10 @@ namespace Promul.Common.Networking
         private readonly NetworkPacket _pingPacket = NetworkPacket.FromProperty(PacketProperty.Pong, 0);
         private readonly NetworkPacket _pongPacket = NetworkPacket.FromProperty(PacketProperty.Ping, 0);
         
-        private NetworkPacket? _connectRequestPacket;
-        private NetworkPacket? _connectAcceptPacket;
         internal byte ConnectionNumber
         {
             get => _connectNumber;
-            private set
+            set
             {
                 _connectNumber = value;
                 _mergeData.ConnectionNumber = value;
@@ -107,7 +105,7 @@ namespace Promul.Common.Networking
         /// <summary>
         ///     The current connection state of this peer.
         /// </summary>
-        public ConnectionState ConnectionState { get; private set; }
+        public ConnectionState ConnectionState { get; protected set; }
 
         /// <summary>
         /// Connection time for internal purposes
@@ -122,7 +120,7 @@ namespace Promul.Common.Networking
         /// <summary>
         ///     The server-assigned ID of this peer.
         /// </summary>
-        public int RemoteId { get; private set; }
+        public int RemoteId { get; protected set; }
 
         /// <summary>
         ///     The current ping to this remote peer, in milliseconds.
@@ -164,7 +162,7 @@ namespace Promul.Common.Networking
         /// </summary>
         public readonly NetStatistics Statistics = new NetStatistics();
 
-        internal PromulPeer(PromulManager promulManager, IPEndPoint remoteEndPoint, int id)
+        internal PeerBase(PromulManager promulManager, IPEndPoint remoteEndPoint, int id)
         {
             Id = id;
             PromulManager = promulManager;
@@ -230,68 +228,52 @@ namespace Promul.Common.Networking
             int idx = channelNumber * NetConstants.ChannelTypeCount +
                        (byte) (ordered ? DeliveryMethod.ReliableOrdered : DeliveryMethod.ReliableUnordered);
             var channel = _channels[idx];
-            return channel != null ? ((ReliableChannel)channel).PacketsInQueue : 0;
+            return (channel as ReliableChannel)?.PacketsInQueue ?? 0;
         }
         
         private ChannelBase CreateChannel(byte idx)
         {
-            ChannelBase newChannel = _channels[idx];
+            var newChannel = _channels[idx];
             if (newChannel != null)
                 return newChannel;
-            switch ((DeliveryMethod)(idx % NetConstants.ChannelTypeCount))
+            
+            newChannel = (DeliveryMethod)(idx % NetConstants.ChannelTypeCount) switch
             {
-                case DeliveryMethod.ReliableUnordered:
-                    newChannel = new ReliableChannel(this, false, idx);
-                    break;
-                case DeliveryMethod.Sequenced:
-                    newChannel = new SequencedChannel(this, false, idx);
-                    break;
-                case DeliveryMethod.ReliableOrdered:
-                    newChannel = new ReliableChannel(this, true, idx);
-                    break;
-                case DeliveryMethod.ReliableSequenced:
-                    newChannel = new SequencedChannel(this, true, idx);
-                    break;
-            }
-            ChannelBase prevChannel = Interlocked.CompareExchange(ref _channels[idx], newChannel, null);
-            if (prevChannel != null)
-                return prevChannel;
-
-            return newChannel;
+                DeliveryMethod.ReliableUnordered => new ReliableChannel(this, false, idx),
+                DeliveryMethod.Sequenced => new SequencedChannel(this, false, idx),
+                DeliveryMethod.ReliableOrdered => new ReliableChannel(this, true, idx),
+                DeliveryMethod.ReliableSequenced => new SequencedChannel(this, true, idx),
+                _ => throw new InvalidOperationException($"CreateChannel requested for delivery method {(DeliveryMethod)(idx % NetConstants.ChannelTypeCount):G}, which is not channeled!")
+            };
+            var prevChannel = Interlocked.CompareExchange(ref _channels[idx], newChannel, null);
+            return prevChannel ?? newChannel;
         }
 
-        internal static async Task<PromulPeer> ConnectToAsync(PromulManager manager, IPEndPoint remote, int id, byte connectionNumber, ArraySegment<byte> data)
+        internal static async Task<OutgoingPeer> ConnectToAsync(PromulManager manager, IPEndPoint remote, int id, byte connectionNumber, ArraySegment<byte> data)
         {
             var time = DateTime.UtcNow.Ticks;
             var packet = NetConnectRequestPacket.Make(data, remote.Serialize(), time, id);
             packet.ConnectionNumber = connectionNumber;
-            var peer = new PromulPeer(manager, remote, id, time, connectionNumber)
-            {
-                ConnectionState = ConnectionState.Outgoing,
-                _connectRequestPacket = packet
-            };
+            var peer = new OutgoingPeer(manager, remote, id, time, connectionNumber, data);
 
-            await manager.SendRaw(peer._connectRequestPacket, peer.EndPoint);
-
-            NetDebug.Write(NetLogLevel.Trace, $"[CC] ConnectId: {peer.ConnectTime}");
+            await peer.SendConnectionRequestAsync();
+            NetDebug.Write(NetLogLevel.Trace, $"[CC] Attempting connection to {peer.Id} at {peer.ConnectTime}");
             return peer;
         }
         
-        internal static async Task<PromulPeer> AcceptAsync(PromulManager promulManager, ConnectionRequest request, int id)
+        internal static async Task<IncomingPeer> AcceptAsync(PromulManager promulManager, ConnectionRequest request, int id)
         {
-            var peer = new PromulPeer(promulManager, request.RemoteEndPoint, id, request.InternalPacket.ConnectionTime, request.InternalPacket.ConnectionNumber)
-            {
-                RemoteId = request.InternalPacket.PeerId,
-                _connectAcceptPacket = NetConnectAcceptPacket.Make(request.InternalPacket.ConnectionTime, request.InternalPacket.ConnectionNumber, id),
-                ConnectionState = ConnectionState.Connected
-            };
-            await promulManager.SendRaw(peer._connectAcceptPacket, peer.EndPoint);
+            var peer = new IncomingPeer(promulManager, request.RemoteEndPoint, id,
+                request.InternalPacket.PeerId,
+                request.InternalPacket.ConnectionTime, request.InternalPacket.ConnectionNumber);
 
-            NetDebug.Write(NetLogLevel.Trace, $"[CC] ConnectId: {peer.ConnectTime}");
+            await peer.SendAcceptedConnectionAsync();
+
+            NetDebug.Write(NetLogLevel.Trace, $"[CC] Accepted connection from {peer.Id}: {peer.ConnectTime}");
             return peer;
         }
 
-        private PromulPeer(PromulManager promulManager, IPEndPoint remote, int id,
+        protected PeerBase(PromulManager promulManager, IPEndPoint remote, int id,
             long connectTime, byte connectionNumber)
         {
             Id = id;
@@ -315,35 +297,7 @@ namespace Promul.Common.Networking
             ConnectTime = connectTime;
             ConnectionNumber = connectionNumber;
         }
-
-        //Reject
-        internal async Task RejectAsync(NetConnectRequestPacket requestData, ArraySegment<byte> data)
-        {
-            ConnectTime = requestData.ConnectionTime;
-            _connectNumber = requestData.ConnectionNumber;
-            await ShutdownAsync(data, false);
-        }
-
-        internal bool ProcessConnectAccept(NetConnectAcceptPacket packet)
-        {
-            if (ConnectionState != ConnectionState.Outgoing)
-                return false;
-
-            //check connection id
-            if (packet.ConnectionTime != ConnectTime)
-            {
-                NetDebug.Write(NetLogLevel.Trace, $"[NC] Invalid connectId: {packet.ConnectionTime} != our({ConnectTime})");
-                return false;
-            }
-            //check connect num
-            ConnectionNumber = packet.ConnectionNumber;
-            RemoteId = packet.PeerId;
-
-            NetDebug.Write(NetLogLevel.Trace, "[NC] Received connection accept");
-            Interlocked.Exchange(ref _timeSinceLastPacket, 0);
-            ConnectionState = ConnectionState.Connected;
-            return true;
-        }
+        
 
         /// <summary>
         ///     Gets the maximum size of user-provided data that can be sent without fragmentation.
@@ -518,7 +472,7 @@ namespace Promul.Common.Networking
                 }
                 ConnectionState = ConnectionState.ShutdownRequested;
                 NetDebug.Write("[Peer] Send disconnect");
-                await PromulManager.SendRaw(_shutdownPacket, EndPoint);
+                await PromulManager.RawSendAsync(_shutdownPacket, EndPoint);
                 return result;
             }
             finally { _shutdownSemaphore.Release();  }
@@ -671,7 +625,7 @@ namespace Promul.Common.Networking
                         FastBitConverter.GetBytes(_pongPacket.Data.Array, _pongPacket.Data.Offset+3, DateTime.UtcNow.Ticks);
                         _pongPacket.Sequence = packet.Sequence;
                         NetDebug.Write($"[PING] Received ping #{packet.Sequence}. Sending pong.");
-                        await PromulManager.SendRaw(_pongPacket, EndPoint);
+                        await PromulManager.RawSendAsync(_pongPacket, EndPoint);
                     }
                     break;
                 case PacketProperty.Pong:
@@ -720,13 +674,13 @@ namespace Promul.Common.Networking
             if (_mergeCount > 1)
             {
                 NetDebug.Write("[P]Send merged: " + _mergePos + ", count: " + _mergeCount);
-                bytesSent = await PromulManager.SendRaw(new ArraySegment<byte>(_mergeData.Data.Array, _mergeData.Data.Offset, NetConstants.HeaderSize + _mergePos),
+                bytesSent = await PromulManager.RawSendAsync(new ArraySegment<byte>(_mergeData.Data.Array, _mergeData.Data.Offset, NetConstants.HeaderSize + _mergePos),
                     EndPoint); 
             }
             else
             {
                 //Send without length information and merging
-                bytesSent = await PromulManager.SendRaw(new ArraySegment<byte>(_mergeData.Data.Array, _mergeData.Data.Offset+NetConstants.HeaderSize + 2, _mergePos - 2),
+                bytesSent = await PromulManager.RawSendAsync(new ArraySegment<byte>(_mergeData.Data.Array, _mergeData.Data.Offset+NetConstants.HeaderSize + 2, _mergePos - 2),
                     EndPoint);
             }
 
@@ -748,7 +702,7 @@ namespace Promul.Common.Networking
             if (mergedPacketSize + sizeTreshold >= MaximumTransferUnit)
             {
                 NetDebug.Write("[P]SendingPacket: " + packet.Property);
-                int bytesSent = await PromulManager.SendRaw(packet, EndPoint);
+                int bytesSent = await PromulManager.RawSendAsync(packet, EndPoint);
 
                 if (PromulManager.RecordNetworkStatistics)
                 {
@@ -794,12 +748,12 @@ namespace Promul.Common.Networking
                         if (_shutdownTimer >= ShutdownDelay)
                         {
                             _shutdownTimer = 0;
-                            await PromulManager.SendRaw(_shutdownPacket, EndPoint);
+                            await PromulManager.RawSendAsync(_shutdownPacket, EndPoint);
                         }
                     }
                     return;
 
-                case ConnectionState.Outgoing:
+                case ConnectionState.Outgoing when this is OutgoingPeer op:
                     _connectTimer += deltaTime;
                     if (_connectTimer > PromulManager.ReconnectDelay)
                     {
@@ -812,7 +766,7 @@ namespace Promul.Common.Networking
                         }
 
                         //else send connect again
-                        await PromulManager.SendRaw(_connectRequestPacket, EndPoint);
+                        await op.SendConnectionRequestAsync();
                     }
                     return;
 
@@ -829,7 +783,7 @@ namespace Promul.Common.Networking
                 _pingPacket.Sequence++;
                 if (_pingTimer.IsRunning) UpdateRoundTripTime((int)_pingTimer.ElapsedMilliseconds);
                 _pingTimer.Restart();
-                await PromulManager.SendRaw(_pingPacket, EndPoint);
+                await PromulManager.RawSendAsync(_pingPacket, EndPoint);
             }
 
             // Calculate round-trip time, and reset if our RTT values are out of date.

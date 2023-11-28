@@ -4,7 +4,7 @@ using Promul.Common.Networking.Packets;
 
 namespace Promul.Common.Networking
 {
-    public partial class PromulPeer
+    public partial class PeerBase
     {
         /// <summary>
         ///     Handles all packets of type <see cref="PacketProperty.MtuOk"/> and <see cref="PacketProperty.MtuCheck"/>.
@@ -61,7 +61,7 @@ namespace Promul.Common.Networking
                     // Reuse the sent packet, to save memory.
                     NetDebug.Write($"[MTU] Check OK for MTU value {frontCheck}. Sending back MTU OK: " + frontCheck);
                     packet.Property = PacketProperty.MtuOk;
-                    await PromulManager.SendRaw(packet, EndPoint);
+                    await PromulManager.RawSendAsync(packet, EndPoint);
                     break;
                 case PacketProperty.MtuOk when frontCheck > MaximumTransferUnit && !_mtuNegotiationComplete:
                 {
@@ -127,7 +127,7 @@ namespace Promul.Common.Networking
                 FastBitConverter.GetBytes(p.Data.Array, p.Data.Offset + 1, newMtu);
                 FastBitConverter.GetBytes(p.Data.Array, p.Data.Offset + p.Data.Count - 4, newMtu);
 
-                if (await PromulManager.SendRaw(p, EndPoint) <= 0)
+                if (await PromulManager.RawSendAsync(p, EndPoint) <= 0)
                     _mtuNegotiationComplete = true;
             }
             finally

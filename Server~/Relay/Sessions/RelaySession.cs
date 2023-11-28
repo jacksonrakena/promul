@@ -5,9 +5,9 @@ namespace Promul.Server.Relay.Sessions;
 
 public class RelaySession
 {
-    readonly Dictionary<int, PromulPeer> _connections = new Dictionary<int, PromulPeer>();
+    readonly Dictionary<int, PeerBase> _connections = new Dictionary<int, PeerBase>();
     int? host = null;
-    public PromulPeer? HostPeer => host != null ? _connections[host.Value] : null;
+    public PeerBase? HostPeer => host != null ? _connections[host.Value] : null;
     public string JoinCode { get; }
 
     readonly ILogger<RelaySession> _logger;
@@ -20,9 +20,9 @@ public class RelaySession
         _server = server;
     }
 
-    public IEnumerable<PromulPeer> Peers => _connections.Values;
+    public IEnumerable<PeerBase> Peers => _connections.Values;
 
-    public async Task OnReceive(PromulPeer from, RelayControlMessage message, DeliveryMethod method)
+    public async Task OnReceive(PeerBase from, RelayControlMessage message, DeliveryMethod method)
     {
         if (!_connections.TryGetValue((int) message.AuthorClientId, out var dest))
         {
@@ -58,7 +58,7 @@ public class RelaySession
 
     }
 
-    private async Task SendAsync(PromulPeer to, RelayControlMessage message, DeliveryMethod method)
+    private async Task SendAsync(PeerBase to, RelayControlMessage message, DeliveryMethod method)
     {
         var writer = CompositeWriter.Create();
         writer.Write(message);
@@ -66,7 +66,7 @@ public class RelaySession
         await to.SendAsync(writer, deliveryMethod: method);
     }
 
-    public async Task OnJoinAsync(PromulPeer peer)
+    public async Task OnJoinAsync(PeerBase peer)
     {
         _connections[peer.Id] = peer;
         if (host == null)
@@ -94,7 +94,7 @@ public class RelaySession
         }
     }
 
-    public async Task OnLeave(PromulPeer peer)
+    public async Task OnLeave(PeerBase peer)
     {
         LogInformation($"{peer.Id} has left");
         if (_connections.ContainsKey(peer.Id))

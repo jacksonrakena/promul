@@ -10,7 +10,7 @@ namespace Promul.Common.Networking
     {
         private async Task PeerUpdateLoopBlockingAsync(CancellationToken ct = default)
         {
-            var peersToRemove = new List<PromulPeer>();
+            var peersToRemove = new List<PeerBase>();
             var startTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
             while (!ct.IsCancellationRequested)
@@ -21,7 +21,7 @@ namespace Promul.Common.Networking
                     var deltaTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - startTime;
                     startTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-                    async Task tick(PromulPeer e)
+                    async Task tick(PeerBase e)
                     {
                         if (e.ConnectionState == ConnectionState.Disconnected &&
                             e.TimeSinceLastPacket > DisconnectTimeout)
