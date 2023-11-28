@@ -21,15 +21,17 @@ public class Program : Window
     public void WriteLog(string output)
     {
         logLabel.Text += output + Environment.NewLine;
+        logLabel.PositionCursor();
     }
 
     public void WriteMessage(string msg)
     {
         mLabel.Text += (msg + Environment.NewLine);
+        mLabel.PositionCursor();
     }
 
-    public Label mLabel;
-    public Label logLabel;
+    public TextView mLabel;
+    public TextView logLabel;
     public bool started;
     public Program ()
     {
@@ -40,10 +42,12 @@ public class Program : Window
             Width = Dim.Percent(50),
             Height = Dim.Percent(90)
         };
-        mLabel = new Label()
+        mLabel = new TextView()
         {
             Width = Dim.Fill(),
-            Height = Dim.Fill()
+            Height = Dim.Fill(),
+            ReadOnly = true,
+            Multiline = true
         };
         messages.Add(mLabel);
         var log = new FrameView("Log")
@@ -52,7 +56,11 @@ public class Program : Window
             Height = Dim.Percent(90),
             X = Pos.Right(messages)
         };
-        logLabel = new Label() { Width = Dim.Fill(), Height = Dim.Fill() };
+        logLabel = new TextView()
+        {
+            Width = Dim.Fill(), Height = Dim.Fill(),ReadOnly = true,
+            Multiline = true
+        };
         log.Add(logLabel);
         var inputFrame = new FrameView("Input")
         {
@@ -79,23 +87,21 @@ public class Program : Window
         };
         inputFrame.Add(input);
         Add(messages,log, inputFrame);
-        
-        NetDebug.Logger
-        Console.SetOut(new RedirectedWriter(logLabel));
+
+        NetDebug.Logger = new RedirectedLogger(logLabel);
     }
 
-    class RedirectedWriter : TextWriter
+    class RedirectedLogger : INetLogger
     {
-        private readonly Label _output;
-        public RedirectedWriter(Label output)
+        private readonly TextView _output;
+        public RedirectedLogger(TextView output)
         {
             _output = output;
         }
-
-        public override Encoding Encoding => Encoding.Default;
-        public override void Write(char value)
+        public void WriteNet(NetLogLevel level, string str, params object[] args)
         {
-            _output.Text += value.ToString();
+            _output.PositionCursor();
+            _output.Text += $"{level:G}: {string.Format(str, args)}" + Environment.NewLine;
         }
     }
 
@@ -144,7 +150,7 @@ public class Program : Window
         {
             var port = int.Parse(input.Replace("host ", ""));
             await StartHost(port);
-            mLabel.Text += "Host started on " + port;
+            WriteMessage("Host started on " + port);
         }
 
         if (input.StartsWith("client"))
