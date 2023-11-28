@@ -6,6 +6,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Promul.Common", "Common\Pro
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Promul.Runtime", "Runtime\Promul.Runtime.csproj", "{29457397-4CEF-4E36-92C7-F3E1101CDBA7}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Promul.Demo", "Demo~\Promul.Demo.csproj", "{2632B8FD-FA5A-4CE1-9A27-09C6D6A3BF34}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,5 +26,9 @@ Global
 		{29457397-4CEF-4E36-92C7-F3E1101CDBA7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{29457397-4CEF-4E36-92C7-F3E1101CDBA7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{29457397-4CEF-4E36-92C7-F3E1101CDBA7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2632B8FD-FA5A-4CE1-9A27-09C6D6A3BF34}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2632B8FD-FA5A-4CE1-9A27-09C6D6A3BF34}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2632B8FD-FA5A-4CE1-9A27-09C6D6A3BF34}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2632B8FD-FA5A-4CE1-9A27-09C6D6A3BF34}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
