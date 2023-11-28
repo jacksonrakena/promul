@@ -7,17 +7,13 @@ namespace Promul.Common.Structs
     {
         public static RelayControlMessage ReadRelayControlMessage(this BinaryReader reader)
         {
+            var ms = (MemoryStream)reader.BaseStream;
             var rcm = new RelayControlMessage
             {
                 Type = (RelayControlMessageType) reader.ReadByte(),
                 AuthorClientId = reader.ReadUInt64(),
-                Data = new ArraySegment<byte>(reader.ReadBytes(int.MaxValue))
+                Data = new ArraySegment<byte>(ms.GetBuffer(), (int)ms.Position, (int)(ms.Capacity-ms.Position))
             };
-            /*
-             *             rcm.Type = (RelayControlMessageType) reader.Data.Array[reader.Data.Offset];
-            rcm.AuthorClientId = BitConverter.ToUInt64(reader.Data.Array, reader.Data.Offset+1);
-            rcm.Data = new ArraySegment<byte>(reader.Data.Array, reader.Data.Offset + 9, reader.Data.Count - 9);
-             */
             return rcm;
         }
         public static void Write(this BinaryWriter writer, RelayControlMessage rcm)

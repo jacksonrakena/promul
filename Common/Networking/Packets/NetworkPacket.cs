@@ -165,7 +165,7 @@ namespace Promul.Common.Networking.Packets
         public BinaryReader CreateReader(int headerSize)
         {
             return new BinaryReader(new MemoryStream(Data.Array, Data.Offset + headerSize,
-                Data.Count));
+                Data.Count - headerSize));
         }
     }
 }
