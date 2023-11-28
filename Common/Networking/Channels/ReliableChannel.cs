@@ -185,41 +185,51 @@ namespace Promul.Common.Networking.Channels
                 await outgoingAcksSem.WaitAsync();
                 try { await Peer.SendUserData(_outgoingAcks); }
                 finally { outgoingAcksSem.Release(); }
+                NetDebug.Write("[RR]SendAcksEnd");
             }
 
             long currentTime = DateTime.UtcNow.Ticks;
             bool hasPendingPackets = false;
 
             await pendingPacketsSem.WaitAsync();
-            
-            //get packets from queue
-
-            await outgoingQueueSem.WaitAsync();
-            
-            while (OutgoingQueue.Count > 0)
+            try
             {
-                int relate = NetUtils.RelativeSequenceNumber(_localSequence, _localWindowStart);
-                if (relate >= _windowSize)
-                    break;
+                await outgoingQueueSem.WaitAsync();
+                try
+                {
+                    while (OutgoingQueue.Count > 0)
+                    {
+                        int relate = NetUtils.RelativeSequenceNumber(_localSequence, _localWindowStart);
+                        if (relate >= _windowSize)
+                            break;
 
-                var netPacket = OutgoingQueue.Dequeue();
-                netPacket.Sequence = (ushort) _localSequence;
-                netPacket.ChannelId = _id;
-                _pendingPackets[_localSequence % _windowSize].Init(netPacket);
-                _localSequence = (_localSequence + 1) % NetConstants.MaxSequence;
+                        var netPacket = OutgoingQueue.Dequeue();
+                        netPacket.Sequence = (ushort)_localSequence;
+                        netPacket.ChannelId = _id;
+                        _pendingPackets[_localSequence % _windowSize].Init(netPacket);
+                        _localSequence = (_localSequence + 1) % NetConstants.MaxSequence;
+                    }
+                }
+                finally
+                {
+                    outgoingQueueSem.Release();
+                }
+
+                //send
+                for (int pendingSeq = _localWindowStart;
+                     pendingSeq != _localSequence;
+                     pendingSeq = (pendingSeq + 1) % NetConstants.MaxSequence)
+                {
+                    // Please note: TrySend is invoked on a mutable struct, it's important to not extract it into a variable here
+                    if (await _pendingPackets[pendingSeq % _windowSize].TrySendAsync(currentTime, Peer))
+                        hasPendingPackets = true;
+                }
             }
-            outgoingQueueSem.Release();
-
-            //send
-            for (int pendingSeq = _localWindowStart; pendingSeq != _localSequence; pendingSeq = (pendingSeq + 1) % NetConstants.MaxSequence)
+            finally
             {
-                // Please note: TrySend is invoked on a mutable struct, it's important to not extract it into a variable here
-                if (await _pendingPackets[pendingSeq % _windowSize].TrySendAsync(currentTime, Peer))
-                    hasPendingPackets = true;
+                pendingPacketsSem.Release();
             }
             
-            pendingPacketsSem.Release();
-
             return hasPendingPackets || _mustSendAcks || OutgoingQueue.Count > 0;
         }
 
@@ -267,41 +277,47 @@ namespace Promul.Common.Networking.Channels
             int ackByte;
             int ackBit;
             await outgoingAcksSem.WaitAsync();
-            if (relate >= _windowSize)
+            try
             {
-                //New window position
-                int newWindowStart = (_remoteWindowStart + relate - _windowSize + 1) % NetConstants.MaxSequence;
-                _outgoingAcks.Sequence = (ushort) newWindowStart;
-
-                //Clean old data
-                while (_remoteWindowStart != newWindowStart)
+                if (relate >= _windowSize)
                 {
-                    ackIdx = _remoteWindowStart % _windowSize;
-                    ackByte = NetConstants.ChanneledHeaderSize + ackIdx / BitsInByte;
-                    ackBit = ackIdx % BitsInByte;
-                    _outgoingAcks.Data.Array[_outgoingAcks.Data.Offset+ackByte] &= (byte) ~(1 << ackBit);
-                    _remoteWindowStart = (_remoteWindowStart + 1) % NetConstants.MaxSequence;
+                    //New window position
+                    int newWindowStart = (_remoteWindowStart + relate - _windowSize + 1) % NetConstants.MaxSequence;
+                    _outgoingAcks.Sequence = (ushort)newWindowStart;
+
+                    //Clean old data
+                    while (_remoteWindowStart != newWindowStart)
+                    {
+                        ackIdx = _remoteWindowStart % _windowSize;
+                        ackByte = NetConstants.ChanneledHeaderSize + ackIdx / BitsInByte;
+                        ackBit = ackIdx % BitsInByte;
+                        _outgoingAcks.Data.Array[_outgoingAcks.Data.Offset + ackByte] &= (byte)~(1 << ackBit);
+                        _remoteWindowStart = (_remoteWindowStart + 1) % NetConstants.MaxSequence;
+                    }
                 }
+
+                //Final stage - process valid packet
+                //trigger acks send
+                _mustSendAcks = true;
+
+                ackIdx = seq % _windowSize;
+                ackByte = NetConstants.ChanneledHeaderSize + ackIdx / BitsInByte;
+                ackBit = ackIdx % BitsInByte;
+                if ((_outgoingAcks.Data.Array[_outgoingAcks.Data.Offset + ackByte] & (1 << ackBit)) != 0)
+                {
+                    NetDebug.Write("[RR]ReliableInOrder duplicate");
+                    //because _mustSendAcks == true
+                    AddToPeerChannelSendQueue();
+                    return false;
+                }
+
+                //save ack
+                _outgoingAcks.Data.Array[_outgoingAcks.Data.Offset + ackByte] |= (byte)(1 << ackBit);
             }
-
-            //Final stage - process valid packet
-            //trigger acks send
-            _mustSendAcks = true;
-
-            ackIdx = seq % _windowSize;
-            ackByte = NetConstants.ChanneledHeaderSize + ackIdx / BitsInByte;
-            ackBit = ackIdx % BitsInByte;
-            if ((_outgoingAcks.Data.Array[_outgoingAcks.Data.Offset+ackByte] & (1 << ackBit)) != 0)
+            finally
             {
-                NetDebug.Write("[RR]ReliableInOrder duplicate");
-                //because _mustSendAcks == true
-                AddToPeerChannelSendQueue();
-                return false;
+                outgoingAcksSem.Release();   
             }
-
-            //save ack
-            _outgoingAcks.Data.Array[_outgoingAcks.Data.Offset+ackByte] |= (byte) (1 << ackBit);
-            outgoingAcksSem.Release();
 
             AddToPeerChannelSendQueue();
 

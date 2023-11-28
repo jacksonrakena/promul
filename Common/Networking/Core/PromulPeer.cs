@@ -685,16 +685,12 @@ namespace Promul.Common.Networking
                     break;
                 case PacketProperty.Ack:
                 case PacketProperty.Channeled:
-                    if (packet.ChannelId >= _channels.Length)
-                    {
-                        //NetManager.PoolRecycle(packet);
-                        break;
-                    }
+                    if (packet.ChannelId >= _channels.Length) break;
+                    
                     var channel = _channels[packet.ChannelId] ?? (packet.Property == PacketProperty.Ack ? null : CreateChannel(packet.ChannelId));
                     if (channel != null)
                     {
                         if (!await channel.HandlePacketAsync(packet)) {}
-                            //NetManager.PoolRecycle(packet);
                     }
                     break;
 
@@ -752,7 +748,7 @@ namespace Promul.Common.Networking
             const int sizeTreshold = 20;
             if (mergedPacketSize + sizeTreshold >= MaximumTransferUnit)
             {
-                NetDebug.Write(NetLogLevel.Trace, "[P]SendingPacket: " + packet.Property);
+                NetDebug.Write("[P]SendingPacket: " + packet.Property);
                 int bytesSent = await PromulManager.SendRaw(packet, EndPoint);
 
                 if (PromulManager.RecordNetworkStatistics)

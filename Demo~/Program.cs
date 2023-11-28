@@ -1,5 +1,6 @@
 using System.Net;
 using Promul.Common.Networking;
+using Promul.Common.Networking.Data;
 
 public enum State
 {
@@ -16,7 +17,7 @@ public class Program
     private CancellationTokenSource cts = new CancellationTokenSource();
     public void PrintStatus()
     {
-        Console.WriteLine("Status: " + state.ToString("G"));
+        Console.WriteLine("Connected to: " + string.Join(",", manager.ConnectedPeerList.Select(e => $"{e.Id} ({e.EndPoint})")));
     }
 
     public void StartCommon()
@@ -33,7 +34,13 @@ public class Program
         manager.ConnectionlessMessagesAllowed = true;
         manager.OnConnectionlessReceive +=
             async (point, reader, type) => Console.WriteLine($"Connectionless receive from " + point);
-        manager.OnReceive += async (p, m, ch, dm) => Console.WriteLine("Received data from " + p.Id + ": " + string.Join(" ", m.ReadBytes(int.MaxValue).Select(e => e.ToString("X"))));
+        manager.OnReceive += async (p, m, ch, dm) =>
+        {
+            var str = m.ReadString();
+            //var data = m.ReadBytes(int.MaxValue);
+            Console.WriteLine("Received data from " + p.Id + ": " +
+                              /*string.Join(" ", data.Select(e => e.ToString("X"))*/str);
+        };
 
     }
     public async Task StartHost(int port)
@@ -74,7 +81,15 @@ public class Program
                 await StartClient(port);
             }
 
-            await Task.Delay(-1);
+            if (input.StartsWith("send"))
+            {
+                var parts = input.Replace("send ", "").Split(" ");
+                var dest = int.Parse(parts[0]);
+                var msg = parts[1];
+                var wr = CompositeWriter.Create();
+                wr.Write(msg);
+                await manager.ConnectedPeerList.First(e => e.Id == dest).SendAsync(wr, DeliveryMethod.ReliableOrdered);
+            }
         }
     }
     public static async Task Main(string[] args)
