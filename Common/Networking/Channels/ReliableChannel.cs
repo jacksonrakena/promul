@@ -7,7 +7,7 @@ namespace Promul.Common.Networking.Channels
 {
     internal sealed class ReliableChannel : ChannelBase
     {
-        private struct PendingReliablePacket
+        private class PendingReliablePacket
         {
             private NetworkPacket? _packet;
             private long _timeStamp;
@@ -34,8 +34,7 @@ namespace Promul.Common.Networking.Channels
                 {
                     double resendDelay = peer.ResendDelay * TimeSpan.TicksPerMillisecond;
                     double packetHoldTime = currentTime - _timeStamp;
-                    if (packetHoldTime < resendDelay)
-                        return true;
+                    if (packetHoldTime < resendDelay) return true;
                     NetDebug.Write($"[RC]Resend: {packetHoldTime} > {resendDelay}");
                 }
                 _timeStamp = currentTime;
@@ -181,11 +180,9 @@ namespace Promul.Common.Networking.Channels
             if (_mustSendAcks)
             {
                 _mustSendAcks = false;
-                NetDebug.Write("[RR]SendAcks");
                 await outgoingAcksSem.WaitAsync();
                 try { await Peer.SendUserData(_outgoingAcks); }
                 finally { outgoingAcksSem.Release(); }
-                NetDebug.Write("[RR]SendAcksEnd");
             }
 
             long currentTime = DateTime.UtcNow.Ticks;
@@ -222,7 +219,9 @@ namespace Promul.Common.Networking.Channels
                 {
                     // Please note: TrySend is invoked on a mutable struct, it's important to not extract it into a variable here
                     if (await _pendingPackets[pendingSeq % _windowSize].TrySendAsync(currentTime, Peer))
+                    {
                         hasPendingPackets = true;
+                    }
                 }
             }
             finally
