@@ -25,7 +25,7 @@ namespace Promul.Common.Networking.Channels
             }
 
             //Returns true if there is a pending packet inside
-            public async Task<bool> TrySendAsync(long currentTime, PeerBase peer)
+            public async Task<bool> TrySendAsync(long utcNowTicks, PeerBase peer)
             {
                 if (_packet == null)
                     return false;
@@ -33,11 +33,11 @@ namespace Promul.Common.Networking.Channels
                 if (_isSent) //check send time
                 {
                     double resendDelay = peer.ResendDelay * TimeSpan.TicksPerMillisecond;
-                    double packetHoldTime = currentTime - _timeStamp;
+                    double packetHoldTime = utcNowTicks - _timeStamp;
                     if (packetHoldTime < resendDelay) return true;
                     NetDebug.Write($"[RC]Resend: {packetHoldTime} > {resendDelay}");
                 }
-                _timeStamp = currentTime;
+                _timeStamp = utcNowTicks;
                 _isSent = true;
                 await peer.SendUserData(_packet);
                 return true;
@@ -102,7 +102,7 @@ namespace Promul.Common.Networking.Channels
         }
 
         private SemaphoreSlim _pendingPacketsSemaphore = new SemaphoreSlim(1, 1);
-        //ProcessAck in packet
+
         private async Task ProcessAckAsync(NetworkPacket packet)
         {
             if (packet.Data.Count != _outgoingAcks.Data.Count)
@@ -143,7 +143,7 @@ namespace Promul.Common.Networking.Channels
                     int pendingIdx = pendingSeq % _windowSize;
                     int currentByte = NetConstants.ChanneledHeaderSize + pendingIdx / BitsInByte;
                     int currentBit = pendingIdx % BitsInByte;
-                    if ((packet.Data[packet.Data.Offset + currentByte] & (1 << currentBit)) == 0)
+                    if ((packet.Data[currentByte] & (1 << currentBit)) == 0)
                     {
                         if (Peer.PromulManager.RecordNetworkStatistics)
                         {
@@ -217,7 +217,6 @@ namespace Promul.Common.Networking.Channels
                      pendingSeq != _localSequence;
                      pendingSeq = (pendingSeq + 1) % NetConstants.MaxSequence)
                 {
-                    // Please note: TrySend is invoked on a mutable struct, it's important to not extract it into a variable here
                     if (await _pendingPackets[pendingSeq % _windowSize].TrySendAsync(currentTime, Peer))
                     {
                         hasPendingPackets = true;
@@ -302,7 +301,7 @@ namespace Promul.Common.Networking.Channels
                 ackIdx = seq % _windowSize;
                 ackByte = NetConstants.ChanneledHeaderSize + ackIdx / BitsInByte;
                 ackBit = ackIdx % BitsInByte;
-                if ((_outgoingAcks.Data.Array[_outgoingAcks.Data.Offset + ackByte] & (1 << ackBit)) != 0)
+                if ((_outgoingAcks.Data[ackByte] & (1 << ackBit)) != 0)
                 {
                     NetDebug.Write("[RR]ReliableInOrder duplicate");
                     //because _mustSendAcks == true

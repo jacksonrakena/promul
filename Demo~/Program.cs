@@ -18,24 +18,20 @@ public class Program : Window
     private PromulManager manager = new PromulManager();
     private CancellationTokenSource cts = new CancellationTokenSource();
 
-    public void WriteLog(string output)
-    {
-        logLabel.Text += output + Environment.NewLine;
-        logLabel.PositionCursor();
-    }
-
     public void WriteMessage(string msg)
     {
         mLabel.Text += (msg + Environment.NewLine);
-        mLabel.PositionCursor();
+        mLabel.MoveEnd();
     }
 
     public TextView mLabel;
     public TextView logLabel;
+    public bool Autoscrolllog = true;
     public bool started;
+    private long debounceTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     public Program ()
     {
-        Title = "Example App (Ctrl+Q to quit)";
+        Title = "Promul Networking Demo (Ctrl+Q to quit)";
 
         var messages = new FrameView("Messages")
         {
@@ -56,12 +52,22 @@ public class Program : Window
             Height = Dim.Percent(90),
             X = Pos.Right(messages)
         };
+        var autoscrollbtn = new CheckBox("Auto-scroll", Autoscrolllog)
+        {
+            Width = Dim.Percent(10),
+            Height = Dim.Percent(10)
+        };
+        autoscrollbtn.Toggled += v =>
+        {
+            Autoscrolllog = v;
+        };
         logLabel = new TextView()
         {
             Width = Dim.Fill(), Height = Dim.Fill(),ReadOnly = true,
-            Multiline = true
+            Multiline = true,
+            Y = Pos.Bottom(autoscrollbtn)
         };
-        log.Add(logLabel);
+        log.Add(autoscrollbtn, logLabel);
         var inputFrame = new FrameView("Input")
         {
             Width = Dim.Fill(),
@@ -77,31 +83,42 @@ public class Program : Window
         {
             Task.Run(async () =>
             {
-                if (!started && args.KeyEvent.Key == Key.Enter)
+                if (args.KeyEvent.Key == Key.Enter && (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - debounceTime) > 2000)
                 {
-                    started = true;
+                    debounceTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                    args.Handled = true;
                     await Process(input.Text.ToString());
-                    input.Clear();
+                    input.Text = "";
                 }
             });
         };
         inputFrame.Add(input);
         Add(messages,log, inputFrame);
 
-        NetDebug.Logger = new RedirectedLogger(logLabel);
+        NetDebug.Logger = new RedirectedLogger(logLabel, this, "log");
     }
 
     class RedirectedLogger : INetLogger
     {
+        private readonly Program _ptr;
+        private FileStream f;
         private readonly TextView _output;
-        public RedirectedLogger(TextView output)
+        public RedirectedLogger(TextView output, Program ptr, string name)
         {
+            _ptr = ptr;
             _output = output;
+            f = File.Create(Path.Join(Environment.CurrentDirectory, $"{DateTimeOffset.UtcNow:s}-{name}.log"));
         }
         public void WriteNet(NetLogLevel level, string str, params object[] args)
         {
-            _output.PositionCursor();
-            _output.Text += $"{level:G}: {string.Format(str, args)}" + Environment.NewLine;
+            var fstr = $"{level:G}: {string.Format(str, args)}" + Environment.NewLine;
+            f.Write(Encoding.Default.GetBytes(fstr));
+            f.Flush();
+            _output.Text += fstr;
+            if (_ptr.Autoscrolllog)
+            {
+                _output.MoveEnd();
+            }
         }
     }
 
@@ -146,17 +163,21 @@ public class Program : Window
 
     public async Task Process(string input)
     {
-        if (input.StartsWith("host"))
+        if (!started)
         {
-            var port = int.Parse(input.Replace("host ", ""));
-            await StartHost(port);
-            WriteMessage("Host started on " + port);
-        }
+            started = true;
+            if (input.StartsWith("host"))
+            {
+                var port = int.Parse(input.Replace("host ", ""));
+                await StartHost(port);
+                WriteMessage("Host started on " + port);
+            }
 
-        if (input.StartsWith("client"))
-        {
-            var port = int.Parse(input.Replace("client ", ""));
-            await StartClient(port);
+            if (input.StartsWith("client"))
+            {
+                var port = int.Parse(input.Replace("client ", ""));
+                await StartClient(port);
+            }
         }
 
         if (input.StartsWith("send"))
@@ -166,8 +187,18 @@ public class Program : Window
             var msg = parts[1];
             var wr = CompositeWriter.Create();
             wr.Write(msg);
-            await manager.ConnectedPeerList.First(e => e.Id == dest).SendAsync(wr, DeliveryMethod.ReliableOrdered);
+            var dv = DeliveryMethod.ReliableOrdered;
+            if (input.Contains("!unreliable"))
+            {
+                dv = DeliveryMethod.Unreliable;
+            }
+            else if (input.Contains("!seq"))
+            {
+                dv = DeliveryMethod.Sequenced;
+            }
+            await manager.ConnectedPeerList.First(e => e.Id == dest).SendAsync(wr, dv);
         }
+        
     }
     public static async Task Main(string[] args)
     {
