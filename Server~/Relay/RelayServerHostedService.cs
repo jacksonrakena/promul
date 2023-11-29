@@ -19,6 +19,12 @@ public class RelayServerHostedService : BackgroundService
             _logger.LogInformation($"Listening on port 4098");
             await _relayServer.PromulManager.ListenAsync(stoppingToken);
         }
-        else _logger.LogError("Failed to start relay server.");
+        else
+        {
+            _logger.LogError("Failed to start relay server.");
+            return;
+        }
+
+        await _relayServer.PromulManager.StopAsync();
     }
 }

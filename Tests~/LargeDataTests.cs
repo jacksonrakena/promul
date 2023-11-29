@@ -53,7 +53,7 @@ public class LargeDataTests
     [Test(Description = "Server sends client correct information, over 100,000 bytes.")]
     [Timeout(10_000)]
     public async Task Test_Very_Large_Data(
-        [Values(100_000, 250_000, 500_000, 1_000_000)] int nDataSize,
+        [Values(100_000, 250_000, 500_000, 1_000_000, 10_000_000)] int nDataSize,
         [Values(DeliveryMethod.ReliableOrdered, DeliveryMethod.ReliableUnordered)] DeliveryMethod method)
     {
         var buffer = new byte[nDataSize];

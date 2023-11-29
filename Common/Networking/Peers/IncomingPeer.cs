@@ -24,7 +24,7 @@ namespace Promul.Common.Networking
             await PromulManager.RawSendAsync(_connectAcceptPacket, EndPoint);
         }
 
-        internal override async Task<ConnectRequestResult> ProcessConnectionRequestAsync(NetConnectRequestPacket connRequest)
+        internal override async Task<ConnectRequestResult> ProcessReconnectionRequestAsync(NetConnectRequestPacket connRequest)
         {
             switch (ConnectionState)
             {

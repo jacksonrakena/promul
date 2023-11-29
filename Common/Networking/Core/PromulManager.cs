@@ -3,12 +3,15 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Promul.Common.Networking.Data;
 using Promul.Common.Networking.Layers;
 using Promul.Common.Networking.Packets;
 using Promul.Common.Networking.Packets.Internal;
+
+[assembly: InternalsVisibleTo("Promul.Tests")]
 
 namespace Promul.Common.Networking
 {
@@ -392,7 +395,7 @@ namespace Promul.Common.Networking
             //if we have peer
             if (peer != null)
             {
-                var processResult = await peer.ProcessConnectionRequestAsync(connRequest);
+                var processResult = await peer.ProcessReconnectionRequestAsync(connRequest);
                 NetDebug.Write($"ConnectRequest LastId: {peer.ConnectTime}, NewId: {connRequest.ConnectionTime}, EP: {remoteEndPoint}, Result: {processResult}");
 
                 switch (processResult)

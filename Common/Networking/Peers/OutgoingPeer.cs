@@ -46,7 +46,7 @@ namespace Promul.Common.Networking
             return true;
         }
 
-        internal override async Task<ConnectRequestResult> ProcessConnectionRequestAsync(NetConnectRequestPacket connRequest)
+        internal override async Task<ConnectRequestResult> ProcessReconnectionRequestAsync(NetConnectRequestPacket connRequest)
         {
             switch (ConnectionState)
             {
