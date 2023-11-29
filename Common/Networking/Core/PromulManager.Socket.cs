@@ -84,7 +84,6 @@ namespace Promul.Common.Networking
             var receiveBuffer = new byte[NetConstants.MaxPacketSize];
             var receive = await s.ReceiveFromAsync(receiveBuffer, SocketFlags.None, bufferEndPoint);
             var packet = NetworkPacket.FromBuffer(new ArraySegment<byte>(receiveBuffer, 0, receive.ReceivedBytes));
-            NetDebug.Write("Received: " + string.Join(" ", new ArraySegment<byte>(receiveBuffer, 0, receive.ReceivedBytes).Select(e => e.ToString("X"))));
             await OnMessageReceived(packet, (IPEndPoint) receive.RemoteEndPoint);
         }
 
@@ -288,8 +287,9 @@ namespace Promul.Common.Networking
         
         /// <summary>
         ///     Sends arbitrary-sized data to the destination endpoint,
-        ///     using an optional provided token.
-        ///     This method will apply any networking layers configured in <see cref="PromulManager"/>.
+        ///     using an optional provided token.<br />
+        ///     This method will apply any networking layers configured in <see cref="PromulManager"/>.<br />
+        ///     This method is at the bottom of the protocol infrastructure, and sends the data directly.
         /// </summary>
         /// <param name="data">The data to send.</param>
         /// <param name="remoteEndPoint">The remote endpoint to send to.</param>
@@ -304,7 +304,7 @@ namespace Promul.Common.Networking
                 if (socket == null) return 0;
             }
 
-            int result;
+            int result = 0;
             try
             {
                 result = await socket.SendToAsync(data, SocketFlags.None, remoteEndPoint);
@@ -334,15 +334,15 @@ namespace Promul.Common.Networking
                         }
 
                         if (OnNetworkError != null) await OnNetworkError(remoteEndPoint, ex.SocketErrorCode);
-                        return -1;
+                        return 0;
 
                     case SocketError.Shutdown:
                         if (OnNetworkError != null) await OnNetworkError(remoteEndPoint, ex.SocketErrorCode);
-                        return -1;
+                        return 0;
 
                     default:
                         NetDebug.WriteError($"[S] {ex}");
-                        return -1;
+                        return 0;
                 }
             }
             catch (Exception ex)
@@ -350,16 +350,15 @@ namespace Promul.Common.Networking
                 NetDebug.WriteError($"[S] {ex}");
                 return 0;
             }
-
-            if (result <= 0)
-                return 0;
-
-            if (RecordNetworkStatistics)
+            finally
             {
-                Statistics.IncrementPacketsSent();
-                Statistics.AddBytesSent(data.Count);
+                if (RecordNetworkStatistics && result != 0)
+                {
+                    Statistics.IncrementPacketsSent();
+                    Statistics.AddBytesSent(result);
+                }
             }
-
+            
             return result;
         }
 

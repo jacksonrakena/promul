@@ -471,8 +471,6 @@ namespace Promul.Common.Networking
         private async Task DebugMessageReceived(NetworkPacket packet, IPEndPoint remoteEndPoint)
         {
 #endif
-            NetDebug.Write($"Received packet of type {packet.Property}, {packet.Data.Count} bytes of data");
-            //NetDebug.Write($"Data: {string.Join(" ", packet.Data.Select(e => e.ToString("X")))}");
             var originalPacketSize = packet.Data.Count;
             if (RecordNetworkStatistics)
             {

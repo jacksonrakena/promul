@@ -118,7 +118,7 @@ namespace Promul.Common.Networking
         public readonly int Id;
 
         /// <summary>
-        ///     The server-assigned ID of this peer.
+        ///     Our ID, according to the remote peer.
         /// </summary>
         public int RemoteId { get; protected set; }
 
@@ -333,8 +333,6 @@ namespace Promul.Common.Networking
             byte channelNumber,
             DeliveryMethod deliveryMethod)
         {
-            
-            NetDebug.Write("SendInternal: " + string.Join(" ", data.Select(x => x.ToString("X"))));
             var length = data.Count;
             if (ConnectionState != ConnectionState.Connected || channelNumber >= _channels.Length)
                 return;
@@ -666,6 +664,27 @@ namespace Promul.Common.Networking
             }
         }
 
+        
+
+        internal async Task SendUserData(NetworkPacket packet)
+        {
+            packet.ConnectionNumber = _connectNumber;
+            int mergedPacketSize = NetConstants.HeaderSize + packet.Data.Count + 2;
+            const int splitThreshold = 20;
+            if (mergedPacketSize + splitThreshold >= MaximumTransferUnit)
+            {
+                NetDebug.Write("[P]SendingPacket: " + packet.Property);
+                await PromulManager.RawSendAsync(packet, EndPoint);
+                return;
+            }
+            if (_mergePos + mergedPacketSize > MaximumTransferUnit) await SendMerged();
+
+            FastBitConverter.GetBytes(_mergeData.Data.Array, _mergeData.Data.Offset+_mergePos + NetConstants.HeaderSize, (ushort)packet.Data.Count);
+            packet.Data.CopyTo(_mergeData.Data.Array, _mergeData.Data.Offset+_mergePos+NetConstants.HeaderSize+2);
+            _mergePos += packet.Data.Count + 2;
+            _mergeCount++;
+        }
+        
         private async Task SendMerged()
         {
             if (_mergeCount == 0)
@@ -692,35 +711,6 @@ namespace Promul.Common.Networking
 
             _mergePos = 0;
             _mergeCount = 0;
-        }
-
-        internal async Task SendUserData(NetworkPacket packet)
-        {
-            packet.ConnectionNumber = _connectNumber;
-            int mergedPacketSize = NetConstants.HeaderSize + packet.Data.Count + 2;
-            const int sizeTreshold = 20;
-            if (mergedPacketSize + sizeTreshold >= MaximumTransferUnit)
-            {
-                NetDebug.Write("[P]SendingPacket: " + packet.Property);
-                int bytesSent = await PromulManager.RawSendAsync(packet, EndPoint);
-
-                if (PromulManager.RecordNetworkStatistics)
-                {
-                    Statistics.IncrementPacketsSent();
-                    Statistics.AddBytesSent(bytesSent);
-                }
-
-                return;
-            }
-            if (_mergePos + mergedPacketSize > MaximumTransferUnit)
-                await SendMerged();
-
-            FastBitConverter.GetBytes(_mergeData.Data.Array, _mergeData.Data.Offset+_mergePos + NetConstants.HeaderSize, (ushort)packet.Data.Count);
-            packet.Data.CopyTo(_mergeData.Data.Array, _mergeData.Data.Offset+_mergePos+NetConstants.HeaderSize+2);
-            //Buffer.BlockCopy(packet.RawData, 0, _mergeData.RawData, _mergePos + NetConstants.HeaderSize + 2, packet.Size);
-            _mergePos += packet.Data.Count + 2;
-            _mergeCount++;
-            //DebugWriteForce("Merged: " + _mergePos + "/" + (_mtu - 2) + ", count: " + _mergeCount);
         }
 
         internal async Task Update(long deltaTime)
@@ -849,5 +839,7 @@ namespace Promul.Common.Networking
                 await PromulManager.MessageDelivered(this, null);
             }
         }
+
+        internal abstract Task<ConnectRequestResult> ProcessConnectionRequestAsync(NetConnectRequestPacket connRequest);
     }
 }

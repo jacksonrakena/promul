@@ -56,9 +56,7 @@ namespace Promul.Common.Networking
             switch (packet.Property)
             {
                 case PacketProperty.MtuCheck:
-                    _mtuCheckAttempts = 0; // Reset MTU checking, because we've received one.
-                    // We've already validated the check above, so we're all good to confirm.
-                    // Reuse the sent packet, to save memory.
+                    _mtuCheckAttempts = 0;
                     NetDebug.Write($"[MTU] Check OK for MTU value {frontCheck}. Sending back MTU OK: " + frontCheck);
                     packet.Property = PacketProperty.MtuOk;
                     await PromulManager.RawSendAsync(packet, EndPoint);

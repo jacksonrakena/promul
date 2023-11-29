@@ -5,6 +5,5 @@ namespace Promul.Common.Networking
 {
     public abstract partial class PeerBase
     {
-        internal abstract Task<ConnectRequestResult> ProcessConnectionRequestAsync(NetConnectRequestPacket connRequest);
     }
 }
