@@ -400,11 +400,9 @@ namespace Promul.Common.Networking
                         p.FragmentPart = partIdx;
                         p.FragmentsTotal = (ushort)totalPackets;
                         p.MarkFragmented();
-                        NetDebug.Write($"Sending fragment {p.FragmentPart}, parameters: (src:{srcOffset}, {srcCount} bytes, total size {data.Count})");
                         Buffer.BlockCopy(data.Array, 
                             srcOffset, p.Data.Array,p.Data.Offset+NetConstants.FragmentedHeaderTotalSize, srcCount);                
                         if (channel != null) await channel.EnqueuePacketAsync(p);
-                        NetDebug.Write($"Sent fragment {p.FragmentPart}");
                     }
                     length -= sendLength;
                 }
@@ -497,13 +495,10 @@ namespace Promul.Common.Networking
             ResendDelay = 25.0 + RoundTripTime * 2.1; // 25 ms + double rtt
         }
 
-        private SemaphoreSlim fragmentLock = new SemaphoreSlim(1, 1);
         internal async Task AddReliablePacket(DeliveryMethod method, NetworkPacket p)
         {
             if (p.IsFragmented)
             {
-                NetDebug.Write($"Fragmented packet {p.FragmentId}: received part {p.FragmentPart+1} of {p.FragmentsTotal}");
-                
                 ushort packetFragId = p.FragmentId;
                 byte packetChannelId = p.ChannelId;
 
@@ -537,7 +532,6 @@ namespace Promul.Common.Networking
                 //Increase total size
                 incomingFragments.TotalSize += p.Data.Count - NetConstants.FragmentedHeaderTotalSize;
 
-                NetDebug.Write($"Received {incomingFragments.ReceivedCount} out of {fragments.Length} fragments");
                 _holdedFragments[packetFragId] = incomingFragments;
                 
                 //Check for finish
@@ -546,7 +540,6 @@ namespace Promul.Common.Networking
 
                 //just simple packet
                 NetworkPacket resultingPacket = NetworkPacket.FromBuffer(new byte[incomingFragments.TotalSize]);
-                NetDebug.Write("Packet complete.");
 
                 int pos = 0;
                 for (int i = 0; i < incomingFragments.ReceivedCount; i++)

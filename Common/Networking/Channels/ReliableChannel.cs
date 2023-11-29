@@ -235,7 +235,6 @@ namespace Promul.Common.Networking.Channels
         //Process incoming packet
         public override async Task<bool> HandlePacketAsync(NetworkPacket packet)
         {
-            NetDebug.Write($"RCV {packet.Property}");
             if (packet.Property == PacketProperty.Ack)
             {
                 await ProcessAckAsync(packet);
@@ -303,7 +302,6 @@ namespace Promul.Common.Networking.Channels
                 ackIdx = seq % _windowSize;
                 ackByte = NetConstants.ChanneledHeaderSize + ackIdx / BitsInByte;
                 ackBit = ackIdx % BitsInByte;
-                NetDebug.Write("Writing ACK for " + ackIdx);
                 if ((_outgoingAcks.Data[ackByte] & (1 << ackBit)) != 0)
                 {
                     NetDebug.Write("[RR]ReliableInOrder duplicate");

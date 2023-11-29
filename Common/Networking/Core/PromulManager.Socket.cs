@@ -97,7 +97,7 @@ namespace Promul.Common.Networking
             EndPoint bufferEndPoint4 = new IPEndPoint(IPAddress.Any, 0);
             EndPoint bufferEndPoint6 = new IPEndPoint(IPAddress.IPv6Any, 0);
 
-            _ = Task.Run(() => PeerUpdateLoopBlockingAsync(cancellationToken));
+            _ = PeerUpdateLoopBlockingAsync(cancellationToken);
             
             while (!cancellationToken.IsCancellationRequested)
             {

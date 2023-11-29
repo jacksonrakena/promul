@@ -17,7 +17,7 @@ namespace Promul.Common.Networking
             {
                 try
                 {
-                    ProcessDelayedPackets();
+                    await ProcessDelayedPackets();
                     var deltaTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - startTime;
                     startTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
@@ -52,7 +52,9 @@ namespace Promul.Common.Networking
                 catch (Exception e)
                 {
                     NetDebug.WriteError("[NM] LogicThread error: " + e);
-                }   
+                }
+
+                await Task.Delay(1, ct);
             }
         }
     }
