@@ -358,22 +358,24 @@ namespace Promul.Common.Networking
             int headerSize = NetworkPacket.GetHeaderSize(property);
             //Save mtu for multithread
             int mtu = MaximumTransferUnit;
+            var completePackageSize = headerSize + data.Count;
             if (data.Count + headerSize > mtu)
             {
                 //if cannot be fragmented
                 if (deliveryMethod != DeliveryMethod.ReliableOrdered && deliveryMethod != DeliveryMethod.ReliableUnordered)
-                    throw new TooBigPacketException("Unreliable or ReliableSequenced packet size exceeded maximum of " + (mtu - headerSize) + " bytes, Check allowed size by GetMaxSinglePacketSize()");
+                    throw new TooBigPacketException($"Packets larger than {mtu-headerSize} (MTU) bytes are only permitted to be sent via reliable and non-sequenced delivery methods.");
 
-                int packetFullSize = mtu - headerSize;
-                int packetDataSize = packetFullSize - NetConstants.FragmentHeaderSize;
+                int maxMtuCarryingCapacity = mtu - headerSize;
+                int packetDataSize = maxMtuCarryingCapacity - NetConstants.FragmentHeaderSize;
                 int totalPackets = data.Count / packetDataSize + (data.Count % packetDataSize == 0 ? 0 : 1);
 
-                NetDebug.Write($@"FragmentSend:
- MTU: {mtu}
- headerSize: {headerSize}
- packetFullSize: {packetFullSize}
- packetDataSize: {packetDataSize}
- totalPackets: {totalPackets}");
+                NetDebug.Write($@"Preparing to send {data.Count} bytes of fragmented data.
+ Complete data size (header + data): {completePackageSize}
+ Current MTU: {mtu}
+ Size of header for {property:G}: {headerSize}
+ Size of fragmentation header: {NetConstants.FragmentHeaderSize}
+ Maximum possible data per packet (MTU-header-fragment header): {packetDataSize}
+ That means we must send {totalPackets} total packets.");
 
                 if (totalPackets > ushort.MaxValue)
                     throw new TooBigPacketException("Data was split in " + totalPackets + " fragments, which exceeds " + ushort.MaxValue);
@@ -383,16 +385,27 @@ namespace Promul.Common.Networking
                 for(ushort partIdx = 0; partIdx < totalPackets; partIdx++)
                 {
                     int sendLength = data.Count > packetDataSize ? packetDataSize : data.Count;
+                    
 
-                    NetworkPacket p = NetworkPacket.FromProperty(property, sendLength + NetConstants.FragmentHeaderSize);
-                    p.FragmentId = currentFragmentId;
-                    p.FragmentPart = partIdx;
-                    p.FragmentsTotal = (ushort)totalPackets;
-                    p.MarkFragmented();
-
-                    if (data.Array != null) Buffer.BlockCopy(data.Array, data.Offset + partIdx * packetDataSize, p.Data.Array,p.Data.Offset+NetConstants.FragmentedHeaderTotalSize, sendLength);
-                    if (channel != null) await channel.EnqueuePacketAsync(p);
-
+                    if (data.Array != null)
+                    {
+                        var srcOffset = data.Offset + partIdx * packetDataSize;
+                        var srcCount = sendLength;
+                        if (srcOffset + srcCount > data.Count)
+                        {
+                            srcCount = data.Count - srcOffset;
+                        }
+                        NetworkPacket p = NetworkPacket.FromProperty(property, srcCount + NetConstants.FragmentHeaderSize);
+                        p.FragmentId = currentFragmentId;
+                        p.FragmentPart = partIdx;
+                        p.FragmentsTotal = (ushort)totalPackets;
+                        p.MarkFragmented();
+                        NetDebug.Write($"Sending fragment {p.FragmentPart}, parameters: (src:{srcOffset}, {srcCount} bytes, total size {data.Count})");
+                        Buffer.BlockCopy(data.Array, 
+                            srcOffset, p.Data.Array,p.Data.Offset+NetConstants.FragmentedHeaderTotalSize, srcCount);                
+                        if (channel != null) await channel.EnqueuePacketAsync(p);
+                        NetDebug.Write($"Sent fragment {p.FragmentPart}");
+                    }
                     length -= sendLength;
                 }
                 return;
@@ -484,14 +497,16 @@ namespace Promul.Common.Networking
             ResendDelay = 25.0 + RoundTripTime * 2.1; // 25 ms + double rtt
         }
 
+        private SemaphoreSlim fragmentLock = new SemaphoreSlim(1, 1);
         internal async Task AddReliablePacket(DeliveryMethod method, NetworkPacket p)
         {
             if (p.IsFragmented)
             {
-                NetDebug.Write($"Fragment. Id: {p.FragmentId}, Part: {p.FragmentPart}, Total: {p.FragmentsTotal}");
-                //Get needed array from dictionary
+                NetDebug.Write($"Fragmented packet {p.FragmentId}: received part {p.FragmentPart+1} of {p.FragmentsTotal}");
+                
                 ushort packetFragId = p.FragmentId;
                 byte packetChannelId = p.ChannelId;
+
                 if (!_holdedFragments.TryGetValue(packetFragId, out var incomingFragments))
                 {
                     incomingFragments = new IncomingFragments
@@ -500,35 +515,38 @@ namespace Promul.Common.Networking
                         ChannelId = p.ChannelId
                     };
                     _holdedFragments.Add(packetFragId, incomingFragments);
-                }
+                } 
 
                 //Cache
                 var fragments = incomingFragments.Fragments;
 
-                //Error check
+                //Error check 
                 if (p.FragmentPart >= fragments.Length ||
                     fragments[p.FragmentPart] != null ||
                     p.ChannelId != incomingFragments.ChannelId)
                 {
-                    //NetManager.PoolRecycle(p);
-                    NetDebug.WriteError("Invalid fragment packet");
+                    NetDebug.WriteError($"Fragmented packet {p.FragmentId} (channel {incomingFragments.ChannelId}): received invalid fragment part {p.FragmentId+1} (channel {p.ChannelId})");
                     return;
                 }
                 //Fill array
                 fragments[p.FragmentPart] = p;
 
                 //Increase received fragments count
-                incomingFragments.ReceivedCount++;
+                Interlocked.Increment(ref incomingFragments.ReceivedCount);
 
                 //Increase total size
                 incomingFragments.TotalSize += p.Data.Count - NetConstants.FragmentedHeaderTotalSize;
 
+                NetDebug.Write($"Received {incomingFragments.ReceivedCount} out of {fragments.Length} fragments");
+                _holdedFragments[packetFragId] = incomingFragments;
+                
                 //Check for finish
                 if (incomingFragments.ReceivedCount != fragments.Length)
                     return;
 
                 //just simple packet
                 NetworkPacket resultingPacket = NetworkPacket.FromBuffer(new byte[incomingFragments.TotalSize]);
+                NetDebug.Write("Packet complete.");
 
                 int pos = 0;
                 for (int i = 0; i < incomingFragments.ReceivedCount; i++)
@@ -558,8 +576,6 @@ namespace Promul.Common.Networking
                         writtenSize);
                     pos += writtenSize;
 
-                    //Free memory
-                    //NetManager.PoolRecycle(fragment);
                     fragments[i] = null;
                 }
 

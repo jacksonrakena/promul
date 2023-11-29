@@ -416,8 +416,6 @@ namespace Promul.Common.Networking
         {
             _udpSocketv4?.Close();
             _udpSocketv6?.Close();
-            _udpSocketv4?.Dispose();
-            _udpSocketv6?.Dispose();
             _udpSocketv4 = null;
             _udpSocketv6 = null;
         }

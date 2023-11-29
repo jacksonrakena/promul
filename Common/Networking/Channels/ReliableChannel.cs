@@ -164,7 +164,7 @@ namespace Promul.Common.Networking.Channels
 
                     //clear packet
                     if (await _pendingPackets[pendingIdx].ClearAsync(Peer))
-                        NetDebug.Write($"[PA]Removing reliableInOrder ack: {pendingSeq} - true");
+                        NetDebug.Write($"[PA]Received ack for sequence: {pendingSeq}");
                 }
             }
             finally
@@ -235,6 +235,7 @@ namespace Promul.Common.Networking.Channels
         //Process incoming packet
         public override async Task<bool> HandlePacketAsync(NetworkPacket packet)
         {
+            NetDebug.Write($"RCV {packet.Property}");
             if (packet.Property == PacketProperty.Ack)
             {
                 await ProcessAckAsync(packet);
@@ -279,6 +280,7 @@ namespace Promul.Common.Networking.Channels
             {
                 if (relate >= _windowSize)
                 {
+                    NetDebug.Write("New window position");
                     //New window position
                     int newWindowStart = (_remoteWindowStart + relate - _windowSize + 1) % NetConstants.MaxSequence;
                     _outgoingAcks.Sequence = (ushort)newWindowStart;
@@ -301,6 +303,7 @@ namespace Promul.Common.Networking.Channels
                 ackIdx = seq % _windowSize;
                 ackByte = NetConstants.ChanneledHeaderSize + ackIdx / BitsInByte;
                 ackBit = ackIdx % BitsInByte;
+                NetDebug.Write("Writing ACK for " + ackIdx);
                 if ((_outgoingAcks.Data[ackByte] & (1 << ackBit)) != 0)
                 {
                     NetDebug.Write("[RR]ReliableInOrder duplicate");
