@@ -8,7 +8,7 @@ namespace Promul.Tests.Contexts;
 public class ManagerGroup : IDisposable
 {
     public readonly string Key = Guid.NewGuid().ToString();
-    public readonly int ServerPort = 5098;
+    public readonly int ServerPort = (int) TestContext.CurrentContext.Random.NextUInt(3000, 9000);
 
     private readonly Dictionary<int, ManagerTestable> _managers = new Dictionary<int, ManagerTestable>();
 

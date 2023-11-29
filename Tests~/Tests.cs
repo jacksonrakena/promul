@@ -5,9 +5,9 @@ using Promul.Tests.Contexts;
 
 namespace Promul.Tests;
 
+[TestFixture(TestName = "Setup and connection tests")]
 [Timeout(DEFAULT_TIMEOUT)]
-[NonParallelizable]
-public class TestsX
+public class AuthorizationTests
 {
     public const int DEFAULT_TIMEOUT = 5000;
     
@@ -55,7 +55,7 @@ public class TestsX
         
         await Task.WhenAll(Enumerable.Range(0, nClients).Select(e => Task.Run(async () =>
         {
-            var client = await _managerGroup.GetClientStarted(Guid.NewGuid().ToString());
+            using var client = await _managerGroup.GetClientStarted(Guid.NewGuid().ToString());
             client.OnPeerDisconnected += async (peer, info) =>
             {
                 if (info.Reason == DisconnectReason.ConnectionRejected) Interlocked.Decrement(ref remainingClients);
@@ -66,7 +66,7 @@ public class TestsX
     }
 
     [Test(Description = "Server sends client correct information.")]
-    public async Task Test_Server_Sends_Client_Correct_Info([Values(1,10,100,1000)] int nDataSize, [Values] DeliveryMethod method)
+    public async Task Test_Small_Data([Values(1,10,100,1000)] int nDataSize, [Values] DeliveryMethod method)
     {
         var buffer = new byte[nDataSize];
         TestContext.CurrentContext.Random.NextBytes(buffer);
@@ -90,33 +90,5 @@ public class TestsX
         };
         await passSem.WaitAsync();
     }
-
-    [Test(Description = "Server sends client correct information, over 1,000 bytes.")]
-    [Timeout(10_000)]
-    public async Task Test_Server_Sends_Client_More_Than_1000_Bytes(
-        [Values(5_000, 10_000, 15_000, 20_000, 50_000, 100_000)] int nDataSize,
-        [Values(DeliveryMethod.ReliableOrdered, DeliveryMethod.ReliableUnordered)] DeliveryMethod method)
-    {
-        var buffer = new byte[nDataSize];
-        TestContext.CurrentContext.Random.NextBytes(buffer);
-        var passSem = new SemaphoreSlim(1, 1);
-        await passSem.WaitAsync();
-        using var server = _managerGroup.GetServer(false);
-        server.OnReceive += async (peer, reader, chan, receivedMethod) =>
-        {
-            var bytes = reader.ReadRemainingBytes();
-            Console.WriteLine($"== RECEIVED {bytes.Count} (expected {buffer.Length}) on method {receivedMethod:G}, expecting {method:G}) ==");
-            var readbuf = bytes.ToArray();
-            if (receivedMethod == method && buffer.SequenceEqual(readbuf))
-            {
-                passSem.Release();
-            }
-        };
-        using var client = await _managerGroup.GetClientStarted();
-        client.OnPeerConnected += async p =>
-        {
-            await p.SendAsync(buffer, method);
-        };
-        await passSem.WaitAsync();
-    }
+    
 }

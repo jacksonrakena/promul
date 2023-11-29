@@ -1,9 +1,4 @@
 ﻿<wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
-	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=ceaca383_002D6766_002D4bc6_002Da6dc_002Dd357e315bd97/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="Test" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;
-  &lt;TestAncestor&gt;
-    &lt;TestId&gt;NUnit3x::EEFB6A7C-9228-4ED6-9EFF-139BBFE666C4::net7.0::Promul.Tests.TestsX.Test_Clients_Request_Connection&lt;/TestId&gt;
-    &lt;TestId&gt;NUnit3x::EEFB6A7C-9228-4ED6-9EFF-139BBFE666C4::net7.0::Promul.Tests.TestsX.Test_Server_Rejects_Invalid_Key&lt;/TestId&gt;
-    &lt;TestId&gt;NUnit3x::EEFB6A7C-9228-4ED6-9EFF-139BBFE666C4::net7.0::Promul.Tests.TestsX.Test_Server_Sends_Client_Correct_Info&lt;/TestId&gt;
-    &lt;TestId&gt;NUnit3x::EEFB6A7C-9228-4ED6-9EFF-139BBFE666C4::net7.0::Promul.Tests.TestsX.Test_Server_Sends_Client_More_Than_1000_Bytes&lt;/TestId&gt;
-  &lt;/TestAncestor&gt;
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=a885c141_002D0b0b_002D4678_002Db84c_002De23ff6f888c7/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="All tests from Solution" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;
+  &lt;Solution /&gt;
 &lt;/SessionState&gt;</s:String></wpf:ResourceDictionary>
