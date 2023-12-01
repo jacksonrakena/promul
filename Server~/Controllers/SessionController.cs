@@ -40,10 +40,15 @@ public class SessionController : ControllerBase
         return sci;
     }
 
-    [HttpPut("Join")]
-    public ActionResult<SessionInfo> JoinSession([FromBody] string joinCode)
+    public struct SessionRequestJoinInfo
     {
-        var session = _relay.GetSession(joinCode);
+        public string JoinCode { get; set; }
+    }
+
+    [HttpPut("Join")]
+    public ActionResult<SessionInfo> JoinSession([FromBody] SessionRequestJoinInfo joinCode)
+    {
+        var session = _relay.GetSession(joinCode.JoinCode);
         if (session == null) return NotFound();
         return new SessionInfo()
         {

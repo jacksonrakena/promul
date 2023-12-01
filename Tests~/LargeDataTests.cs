@@ -3,7 +3,6 @@ using Promul.Tests.Contexts;
 
 namespace Promul.Tests;
 
-[TestFixture(TestName = "Tests with large payloads (1KB - 1MB)")]
 [Timeout(DEFAULT_TIMEOUT)]
 public class LargeDataTests
 {

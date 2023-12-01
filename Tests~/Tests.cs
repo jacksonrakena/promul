@@ -5,7 +5,6 @@ using Promul.Tests.Contexts;
 
 namespace Promul.Tests;
 
-[TestFixture(TestName = "Setup and connection tests")]
 [Timeout(DEFAULT_TIMEOUT)]
 public class AuthorizationTests
 {
