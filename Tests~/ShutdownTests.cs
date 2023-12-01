@@ -4,7 +4,6 @@ using Promul.Tests.Contexts;
 
 namespace Promul.Tests;
 
-[TestFixture(TestName = "Shutdown and rejection tests")]
 [Timeout(DEFAULT_TIMEOUT)]
 public class ShutdownTests
 {

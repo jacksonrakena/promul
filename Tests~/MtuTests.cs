@@ -3,7 +3,6 @@ using Promul.Tests.Contexts;
 
 namespace Promul.Tests;
 
-[TestFixture(TestName = "MTU tests")]
 [Timeout(DEFAULT_TIMEOUT)]
 public class MtuTests
 {
