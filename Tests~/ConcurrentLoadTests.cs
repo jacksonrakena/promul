@@ -73,7 +73,7 @@ public class ConcurrentLoadTests
                 await p.SendAsync(buffer, method);
             };
         }
-
+        
         while (remainingClients != 0)
         {
         }

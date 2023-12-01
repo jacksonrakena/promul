@@ -162,24 +162,6 @@ namespace Promul.Common.Networking
         /// </summary>
         public readonly NetStatistics Statistics = new NetStatistics();
 
-        internal PeerBase(PromulManager promulManager, IPEndPoint remoteEndPoint, int id)
-        {
-            Id = id;
-            PromulManager = promulManager;
-            ResetMtu();
-            EndPoint = remoteEndPoint;
-            ConnectionState = ConnectionState.Connected;
-            _mergeData = NetworkPacket.FromProperty(PacketProperty.Merged, NetConstants.MaxPacketSize);
-            _pingPacket.Sequence = 1;
-
-            _unreliableChannel = new Queue<NetworkPacket>();
-            _holdedFragments = new Dictionary<ushort, IncomingFragments>();
-            _deliveredFragments = new Dictionary<ushort, ushort>();
-
-            _channels = new ChannelBase[promulManager.ChannelsCount * NetConstants.ChannelTypeCount];
-            _channelSendQueue = new ConcurrentQueue<ChannelBase>();
-        }
-
         internal void InitiateEndPointChange()
         {
             ResetMtu();
@@ -731,7 +713,7 @@ namespace Promul.Common.Networking
                     if (_timeSinceLastPacket > PromulManager.DisconnectTimeout)
                     {
                         NetDebug.Write($"[UPDATE] Disconnect by timeout: {_timeSinceLastPacket} > {PromulManager.DisconnectTimeout}");
-                        await PromulManager.ForceDisconnectPeerAsync(this, DisconnectReason.Timeout, 0, null);
+                        await PromulManager.ForceDisconnectPeerAsync(this, DisconnectReason.Timeout, 0);
                         return;
                     }
                     break;
@@ -760,7 +742,7 @@ namespace Promul.Common.Networking
                         _connectionAttempts++;
                         if (_connectionAttempts > PromulManager.MaximumConnectionAttempts)
                         {
-                            await PromulManager.ForceDisconnectPeerAsync(this, DisconnectReason.ConnectionFailed, 0, null);
+                            await PromulManager.ForceDisconnectPeerAsync(this, DisconnectReason.ConnectionFailed, 0);
                             return;
                         }
 
@@ -849,6 +831,6 @@ namespace Promul.Common.Networking
             }
         }
 
-        internal abstract Task<ConnectRequestResult> ProcessConnectionRequestAsync(NetConnectRequestPacket connRequest);
+        internal abstract Task<ConnectRequestResult> ProcessReconnectionRequestAsync(NetConnectRequestPacket connRequest);
     }
 }
