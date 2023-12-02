@@ -34,7 +34,7 @@ public class RelaySession
         {
             case RelayControlMessageType.Data:
                 Console.WriteLine($"{from.Id} requesting to send {message.Data.Count} bytes of data to {message.AuthorClientId}");
-                await SendAsync(HostPeer!, new RelayControlMessage { Type = RelayControlMessageType.Data, AuthorClientId = (ulong)from.Id, Data = message.Data }, method);
+                await SendAsync(dest, new RelayControlMessage { Type = RelayControlMessageType.Data, AuthorClientId = (ulong)from.Id, Data = message.Data }, method);
                 break;
             case RelayControlMessageType.KickFromRelay:
                 var target = message.AuthorClientId;
