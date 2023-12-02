@@ -112,7 +112,7 @@ namespace Promul.Runtime
                 // Relayed data
                 case RelayControlMessageType.Data:
                 {
-                    Debug.Log("Data: " + string.Join(" ", message.Data.Select(e => e.ToString("X"))));
+                    Debug.Log("Data: " + string.Join(" ", message.Data.Select(e => e.ToString("X2"))));
                     var data = new byte[message.Data.Count];
                     message.Data.CopyTo(data);
                     _queue.Enqueue((NetworkEvent.Data, author, data, 0));

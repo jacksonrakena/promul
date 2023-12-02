@@ -334,7 +334,7 @@ namespace Promul.Common.Networking
             }
 
             //Prepare
-            NetDebug.Write("[RS]Packet: " + property);
+            LogDebug($"{property} channel message queued ({data.Count} bytes, {deliveryMethod:G})");
 
             //Check fragmentation
             int headerSize = NetworkPacket.GetHeaderSize(property);
@@ -558,6 +558,7 @@ namespace Promul.Common.Networking
                 _holdedFragments.Remove(packetFragId);
 
                 //Send to process
+                LogDebug($"Reconstructed fragmented packet from {fragments.Length} fragments (size {resultingPacket.Data.Count})");
                 await PromulManager.CreateReceiveEvent(resultingPacket, method, (byte)(packetChannelId / NetConstants.ChannelTypeCount), 0, this);
             }
             else //Just simple packet
@@ -613,7 +614,7 @@ namespace Promul.Common.Networking
                     {
                         FastBitConverter.GetBytes(_pongPacket.Data.Array, _pongPacket.Data.Offset+3, DateTime.UtcNow.Ticks);
                         _pongPacket.Sequence = packet.Sequence;
-                        NetDebug.Write($"[PING] Received ping #{packet.Sequence}. Sending pong.");
+                        LogDebug($"[PING] Received ping #{packet.Sequence}. Sending pong.");
                         await PromulManager.RawSendAsync(_pongPacket, EndPoint);
                     }
                     break;
@@ -625,7 +626,7 @@ namespace Promul.Common.Networking
                         RemoteTimeDelta = BitConverter.ToInt64(packet.Data[3..]) + (elapsedMs * TimeSpan.TicksPerMillisecond ) / 2 - DateTime.UtcNow.Ticks;
                         UpdateRoundTripTime(elapsedMs);
                         await PromulManager.ConnectionLatencyUpdated(this, elapsedMs / 2);
-                        NetDebug.Write($"[PING] Received pong #{packet.Sequence}. Time: {elapsedMs}ms. Delta time: {RemoteTimeDelta}");
+                        LogDebug($"[PING] Received pong #{packet.Sequence}. Time: {elapsedMs}ms. Delta time: {RemoteTimeDelta}");
                     }
                     break;
                 case PacketProperty.Ack:
@@ -664,8 +665,8 @@ namespace Promul.Common.Networking
             const int splitThreshold = 20;
             //if (mergedPacketSize + splitThreshold >= MaximumTransferUnit)
             //{
-                NetDebug.Write("[P]SendingPacket: " + packet.Property);
                 await PromulManager.RawSendAsync(packet, EndPoint);
+                LogDebug($"[Send] Sent {packet.Data.Count} bytes with type {packet.Property}.");
                 return;
             //}
             // if (_mergePos + mergedPacketSize > MaximumTransferUnit) await SendMerged();
@@ -683,7 +684,7 @@ namespace Promul.Common.Networking
             int bytesSent;
             if (_mergeCount > 1)
             {
-                NetDebug.Write("[P]Send merged: " + _mergePos + ", count: " + _mergeCount);
+                LogDebug("[P]Send merged: " + _mergePos + ", count: " + _mergeCount);
                 bytesSent = await PromulManager.RawSendAsync(new ArraySegment<byte>(_mergeData.Data.Array, _mergeData.Data.Offset, NetConstants.HeaderSize + _mergePos),
                     EndPoint); 
             }
@@ -712,7 +713,7 @@ namespace Promul.Common.Networking
                 case ConnectionState.Connected:
                     if (_timeSinceLastPacket > PromulManager.DisconnectTimeout)
                     {
-                        NetDebug.Write($"[UPDATE] Disconnect by timeout: {_timeSinceLastPacket} > {PromulManager.DisconnectTimeout}");
+                        LogDebug($"[UPDATE] Disconnect by timeout: {_timeSinceLastPacket} > {PromulManager.DisconnectTimeout}");
                         await PromulManager.ForceDisconnectPeerAsync(this, DisconnectReason.Timeout, 0);
                         return;
                     }
@@ -759,7 +760,7 @@ namespace Promul.Common.Networking
             _pingSendTimer += deltaTime;
             if (_pingSendTimer >= PromulManager.PingInterval)
             {
-                NetDebug.Write($"[PING] Sending regular ping #{_pingPacket.Sequence+1}");
+                LogDebug($"[PING] Sending regular ping #{_pingPacket.Sequence+1}");
                 _pingSendTimer = 0;
                 _pingPacket.Sequence++;
                 if (_pingTimer.IsRunning) UpdateRoundTripTime((int)_pingTimer.ElapsedMilliseconds);
@@ -832,5 +833,10 @@ namespace Promul.Common.Networking
         }
 
         internal abstract Task<ConnectRequestResult> ProcessReconnectionRequestAsync(NetConnectRequestPacket connRequest);
+
+        public void LogDebug(string text)
+        {
+            NetDebug.Write($"[Peer {this.Id}] {text}");
+        }
     }
 }
