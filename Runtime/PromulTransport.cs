@@ -77,7 +77,7 @@ namespace Promul.Runtime
         
         public override void Send(ulong clientId, ArraySegment<byte> data, NetworkDelivery qos)
         {
-            Debug.Log("Sending: " + string.Join(" ", data.Select(e => e.ToString("X"))));
+            Debug.Log("Sending to " + clientId + ": " + string.Join(" ", data.Select(e => e.ToString("X2"))));
             Task.Run(async () =>
             {
                 await SendControl(new RelayControlMessage

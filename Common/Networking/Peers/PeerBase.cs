@@ -662,18 +662,18 @@ namespace Promul.Common.Networking
             packet.ConnectionNumber = _connectNumber;
             int mergedPacketSize = NetConstants.HeaderSize + packet.Data.Count + 2;
             const int splitThreshold = 20;
-            if (mergedPacketSize + splitThreshold >= MaximumTransferUnit)
-            {
+            //if (mergedPacketSize + splitThreshold >= MaximumTransferUnit)
+            //{
                 NetDebug.Write("[P]SendingPacket: " + packet.Property);
                 await PromulManager.RawSendAsync(packet, EndPoint);
                 return;
-            }
-            if (_mergePos + mergedPacketSize > MaximumTransferUnit) await SendMerged();
-
-            FastBitConverter.GetBytes(_mergeData.Data.Array, _mergeData.Data.Offset+_mergePos + NetConstants.HeaderSize, (ushort)packet.Data.Count);
-            packet.Data.CopyTo(_mergeData.Data.Array, _mergeData.Data.Offset+_mergePos+NetConstants.HeaderSize+2);
-            _mergePos += packet.Data.Count + 2;
-            _mergeCount++;
+            //}
+            // if (_mergePos + mergedPacketSize > MaximumTransferUnit) await SendMerged();
+            //
+            // FastBitConverter.GetBytes(_mergeData.Data.Array, _mergeData.Data.Offset+_mergePos + NetConstants.HeaderSize, (ushort)packet.Data.Count);
+            // packet.Data.CopyTo(_mergeData.Data.Array, _mergeData.Data.Offset+_mergePos+NetConstants.HeaderSize+2);
+            // _mergePos += packet.Data.Count + 2;
+            // _mergeCount++;
         }
         
         private async Task SendMerged()
