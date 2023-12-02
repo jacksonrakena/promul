@@ -3,10 +3,9 @@ using Promul.Tests.Contexts;
 
 namespace Promul.Tests;
 
-[Timeout(DEFAULT_TIMEOUT)]
+[Timeout(TestConstants.DefaultTimeout)]
 public class LargeDataTests
 {
-    public const int DEFAULT_TIMEOUT = 5000;
     private ManagerGroup _managerGroup;
     [SetUp]
     public void Setup()
@@ -21,7 +20,7 @@ public class LargeDataTests
     }
     
     [Test(Description = "Server sends client correct information, over 1,000 bytes.")]
-    [Timeout(10_000)]
+    [Timeout(TestConstants.ExtendedTimeout)]
     public async Task Test_Large_Data(
         [Values(5_000, 10_000, 15_000, 20_000, 50_000, 100_000)] int nDataSize,
         [Values(DeliveryMethod.ReliableOrdered, DeliveryMethod.ReliableUnordered)] DeliveryMethod method)
@@ -50,7 +49,7 @@ public class LargeDataTests
     }
     
     [Test(Description = "Server sends client correct information, over 100,000 bytes.")]
-    [Timeout(10_000)]
+    [Timeout(TestConstants.ExtendedTimeout)]
     public async Task Test_Very_Large_Data(
         [Values(100_000, 250_000, 500_000, 1_000_000, 10_000_000)] int nDataSize,
         [Values(DeliveryMethod.ReliableOrdered, DeliveryMethod.ReliableUnordered)] DeliveryMethod method)

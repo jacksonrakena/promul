@@ -5,10 +5,9 @@ using Promul.Tests.Contexts;
 
 namespace Promul.Tests;
 
-[Timeout(DEFAULT_TIMEOUT)]
+[Timeout(TestConstants.DefaultTimeout)]
 public class AuthorizationTests
 {
-    public const int DEFAULT_TIMEOUT = 5000;
     
     private ManagerGroup _managerGroup;
     [SetUp]

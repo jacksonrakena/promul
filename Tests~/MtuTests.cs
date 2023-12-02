@@ -3,11 +3,9 @@ using Promul.Tests.Contexts;
 
 namespace Promul.Tests;
 
-[Timeout(DEFAULT_TIMEOUT)]
+[Timeout(TestConstants.ExtendedTimeout)]
 public class MtuTests
 {
-    public const int DEFAULT_TIMEOUT = 7000;
-    
     private ManagerGroup _managerGroup;
     [SetUp]
     public void Setup()
