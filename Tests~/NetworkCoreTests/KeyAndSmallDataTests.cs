@@ -6,9 +6,8 @@ using Promul.Tests.Contexts;
 namespace Promul.Tests;
 
 [Timeout(TestConstants.DefaultTimeout)]
-public class AuthorizationTests
+public class KeyAndSmallDataTests
 {
-    
     private ManagerGroup _managerGroup;
     [SetUp]
     public void Setup()
