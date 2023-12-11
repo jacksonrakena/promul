@@ -323,7 +323,7 @@ namespace Promul.Common.Networking.Channels
             //detailed check
             if (seq == _remoteSequence)
             {
-                Peer.LogDebug($"Reliable packet of type {packet.Property} ({packet.Data.Count} bytes) received successfully");
+                Peer.LogDebug($"[Receive] {packet.Property} ({packet.Data.Count} bytes)");
                 await Peer.AddReliablePacket(_deliveryMethod, packet);
                 _remoteSequence = (_remoteSequence + 1) % NetConstants.MaxSequence;
 

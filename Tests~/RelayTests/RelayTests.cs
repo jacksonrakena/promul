@@ -73,7 +73,7 @@ public class RelayTests
         return new RelayPair(from, to, buf);
     }
     [Test]
-    public async Task Test_Message_Relays([Range(2, 100)] int nRelayClients)
+    public async Task Test_Message_Relays([Values(2,3,4,5,6,7,8,9,10,25,50,75,100)] int nRelayClients)
     {
         var nMessages = nRelayClients*2;
         var sessionId = Guid.NewGuid().ToString();
@@ -102,6 +102,7 @@ public class RelayTests
         }
 
         var receivedMessagePairs = new ConcurrentBag<RelayPair>();
+        var nReceivedMessagePairs = 0;
 
         Console.WriteLine("Message pairs:");
         foreach (var mp in messagePairs)
@@ -148,8 +149,9 @@ public class RelayTests
                             if (mp.Data.SequenceEqual(control.Data))
                             {
                                 receivedMessagePairs.Add(mp);
+                                Interlocked.Increment(ref nReceivedMessagePairs);
                                 Console.WriteLine($"== {mp.To} received {control.Data.Count} from {mp.From} ==");
-                                Console.WriteLine($"== Progress: {receivedMessagePairs.Count}/{messagePairs.Count}");
+                                Console.WriteLine($"== Progress: {nReceivedMessagePairs}/{messagePairs.Count}");
                             }
                             else
                             {

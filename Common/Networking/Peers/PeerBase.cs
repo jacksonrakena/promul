@@ -330,10 +330,7 @@ namespace Promul.Common.Networking
                 property = PacketProperty.Channeled;
                 channel = CreateChannel((byte)(channelNumber * NetConstants.ChannelTypeCount + (byte)deliveryMethod));
             }
-
-            //Prepare
-            LogDebug($"{property} channel message queued ({data.Count} bytes, {deliveryMethod:G})");
-
+            
             //Check fragmentation
             int headerSize = NetworkPacket.GetHeaderSize(property);
             //Save mtu for multithread
@@ -460,7 +457,6 @@ namespace Promul.Common.Networking
                     data.CopyTo(_shutdownPacket.Data.Array,_shutdownPacket.Data.Offset+9);
                 }
                 ConnectionState = ConnectionState.ShutdownRequested;
-                NetDebug.Write("[Peer] Send disconnect");
                 await PromulManager.RawSendAsync(_shutdownPacket, EndPoint);
                 return result;
             }
@@ -612,7 +608,6 @@ namespace Promul.Common.Networking
                     {
                         FastBitConverter.GetBytes(_pongPacket.Data.Array, _pongPacket.Data.Offset+3, DateTime.UtcNow.Ticks);
                         _pongPacket.Sequence = packet.Sequence;
-                        LogDebug($"[PING] Received ping #{packet.Sequence}. Sending pong.");
                         await PromulManager.RawSendAsync(_pongPacket, EndPoint);
                     }
                     break;
@@ -624,7 +619,6 @@ namespace Promul.Common.Networking
                         RemoteTimeDelta = BitConverter.ToInt64(packet.Data[3..]) + (elapsedMs * TimeSpan.TicksPerMillisecond ) / 2 - DateTime.UtcNow.Ticks;
                         UpdateRoundTripTime(elapsedMs);
                         await PromulManager.ConnectionLatencyUpdated(this, elapsedMs / 2);
-                        LogDebug($"[PING] Received pong #{packet.Sequence}. Time: {elapsedMs}ms. Delta time: {RemoteTimeDelta}");
                     }
                     break;
                 case PacketProperty.Ack:
@@ -664,7 +658,7 @@ namespace Promul.Common.Networking
             //if (mergedPacketSize + splitThreshold >= MaximumTransferUnit)
             //{
                 await PromulManager.RawSendAsync(packet, EndPoint);
-                LogDebug($"[Send] Sent {packet.Data.Count} bytes with type {packet.Property}.");
+                LogDebug($"[Send] {packet.Property} ({packet.Data.Count} bytes)");
                 return;
             //}
             // if (_mergePos + mergedPacketSize > MaximumTransferUnit) await SendMerged();
@@ -758,7 +752,6 @@ namespace Promul.Common.Networking
             _pingSendTimer += deltaTime;
             if (_pingSendTimer >= PromulManager.PingInterval)
             {
-                LogDebug($"[PING] Sending regular ping #{_pingPacket.Sequence+1}");
                 _pingSendTimer = 0;
                 _pingPacket.Sequence++;
                 if (_pingTimer.IsRunning) UpdateRoundTripTime((int)_pingTimer.ElapsedMilliseconds);

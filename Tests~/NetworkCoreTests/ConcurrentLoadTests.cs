@@ -61,6 +61,7 @@ public class ConcurrentLoadTests
             if (receivedMethod == method && buffer.SequenceEqual(readbuf))
             {
                 Interlocked.Decrement(ref remainingClients);
+                Console.WriteLine($"== REMAINING CLIENTS: {remainingClients}");
             }
         };
         foreach (var c in Enumerable.Range(0, nClients))

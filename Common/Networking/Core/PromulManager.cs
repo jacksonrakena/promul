@@ -731,8 +731,6 @@ namespace Promul.Common.Networking
         /// <param name="sendDisconnectMessages">Whether to notify peers of pending disconnection.</param>
         public async Task StopAsync(bool sendDisconnectMessages = true)
         {
-            NetDebug.Write("[Control] Stopping.");
-
 #if UNITY_2018_3_OR_NEWER
             _pausedSocketFix.Deinitialize();
             _pausedSocketFix = null;
