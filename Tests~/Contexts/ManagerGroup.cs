@@ -34,7 +34,7 @@ public class ManagerGroup : IDisposable
         _ = manager.ListenAsync(manager.Cts.Token);
         var cw = CompositeWriter.Create();
         cw.Write(string.IsNullOrEmpty(serverKey) ? Key : serverKey);
-        await manager.ConnectAsync(NetUtils.MakeEndPoint("127.0.0.1", ServerPort), cw);
+        _ = manager.ConnectAsync(NetUtils.MakeEndPoint("127.0.0.1", ServerPort), cw);
         _managers[key] = manager;
         return manager;
     }
