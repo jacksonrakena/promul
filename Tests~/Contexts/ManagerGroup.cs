@@ -27,7 +27,7 @@ public class ManagerGroup : IDisposable
 
     public async Task<ManagerTestable> GetClientStarted(string serverKey = "", bool ipv6Enabled = false)
     {
-        var key = _managers.Keys.MaxBy(a => a) + 1;
+        var key = _managers.Keys.Count > 0 ? _managers.Keys.MaxBy(a => a) + 1 : 0;
         var manager = new ManagerTestable(key, this, new CancellationTokenSource());
         manager.Ipv6Enabled = ipv6Enabled;
         manager.Bind(IPAddress.Any, IPAddress.Any, 0);
