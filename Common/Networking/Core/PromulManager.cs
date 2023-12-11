@@ -21,35 +21,35 @@ namespace Promul.Common.Networking
     /// </summary>
     public partial class PromulManager
     {
-#if DEBUG
-        private struct IncomingData
-        {
-            public NetworkPacket Data;
-            public IPEndPoint EndPoint;
-            public DateTime TimeWhenGet;
-        }
-
-        private readonly SemaphoreSlim _pingSimulationSemaphore = new SemaphoreSlim(1, 1);
-        private readonly List<IncomingData> _pingSimulationList = new List<IncomingData>();
-        private readonly Random _randomGenerator = new Random();
-        private const int MinLatencyThreshold = 5;
-#endif
-        
-        private readonly Dictionary<IPEndPoint, PeerBase> _peers = new(new IPEndPointComparer());
-        private readonly Dictionary<IPEndPoint, ConnectionRequest> _connectionRequests = new(new IPEndPointComparer());
-        private readonly ConcurrentDictionary<IPEndPoint, NtpRequest> _ntpRequests = new(new IPEndPointComparer());
-        private volatile PeerBase? _headPeer;
-        private int _connectedPeersCount;
         private readonly List<PeerBase> _connectedPeerListCache = new();
-        private PeerBase?[] _peersArray = new PeerBase[32];
+        private readonly Dictionary<IPEndPoint, ConnectionRequest> _connectionRequests = new(new IPEndPointComparer());
         private readonly PacketLayerBase? _extraPacketLayer;
+        private readonly ConcurrentDictionary<IPEndPoint, NtpRequest> _ntpRequests = new(new IPEndPointComparer());
+
+        private readonly Dictionary<IPEndPoint, PeerBase> _peers = new(new IPEndPointComparer());
+        private byte _channelsCount = 1;
+        private int _connectedPeersCount;
+        private volatile PeerBase? _headPeer;
         private int _lastPeerId;
         private ConcurrentQueue<int> _peerIds = new();
-        private byte _channelsCount = 1;
+        private PeerBase?[] _peersArray = new PeerBase[32];
+
+        /// <summary>
+        ///     Creates a new <see cref="PromulManager" />.
+        /// </summary>
+        /// <param name="extraPacketLayer">
+        ///     An extra packet processing layer, used for utilities like CRC checksum verification or encryption layers.
+        ///     All <see cref="PromulManager" /> instances connected together must have the same configured layers.
+        /// </param>
+        public PromulManager(PacketLayerBase? extraPacketLayer = null)
+        {
+            //NatPunchModule = new NatPunchModule(this);
+            _extraPacketLayer = extraPacketLayer;
+        }
 
         /// <summary>
         ///     Allow messages to be received from peers that the manager has not established a connection with.
-        ///     To send a connectionless message, call <see cref="SendConnectionlessMessageAsync"/>.
+        ///     To send a connectionless message, call <see cref="SendConnectionlessMessageAsync" />.
         /// </summary>
         public bool ConnectionlessMessagesAllowed { get; set; }
 
@@ -60,7 +60,7 @@ namespace Promul.Common.Networking
 
         /// <summary>
         ///     The maximum time, in milliseconds, that the manager will allow before disconnecting a peer for inactivity.
-        ///     All clients must have a <see cref="PingInterval"/> lower than this value to avoid unintentional timeouts.
+        ///     All clients must have a <see cref="PingInterval" /> lower than this value to avoid unintentional timeouts.
         /// </summary>
         public int DisconnectTimeout { get; set; } = 5000;
 
@@ -78,17 +78,17 @@ namespace Promul.Common.Networking
 
         /// <summary>
         ///     The chance (percentage between 0 and 100) of packet loss.
-        ///     Requires <see cref="SimulatePacketLoss"/> to be enabled.
+        ///     Requires <see cref="SimulatePacketLoss" /> to be enabled.
         /// </summary>
         public int SimulatePacketLossChance { get; set; } = 10;
 
         /// <summary>
-        ///     The minimum latency, in milliseconds, to add when <see cref="SimulateLatency"/> is enabled.
+        ///     The minimum latency, in milliseconds, to add when <see cref="SimulateLatency" /> is enabled.
         /// </summary>
         public int SimulationMinLatency { get; set; } = 30;
 
         /// <summary>
-        ///     The maximum latency, in milliseconds, to add when <see cref="SimulateLatency"/> is enabled.
+        ///     The maximum latency, in milliseconds, to add when <see cref="SimulateLatency" /> is enabled.
         /// </summary>
         public int SimulationMaxLatency { get; set; } = 100;
 
@@ -104,24 +104,24 @@ namespace Promul.Common.Networking
         public int ReconnectDelay { get; set; } = 500;
 
         /// <summary>
-        ///     The maximum connection attempts the manger will make before stopping and calling <see cref="OnPeerDisconnected"/>.
+        ///     The maximum connection attempts the manger will make before stopping and calling <see cref="OnPeerDisconnected" />.
         /// </summary>
         public int MaximumConnectionAttempts { get; set; } = 10;
 
         /// <summary>
-        /// TODO UPDATE
-        /// Enables socket option "ReuseAddress" for specific purposes
+        ///     TODO UPDATE
+        ///     Enables socket option "ReuseAddress" for specific purposes
         /// </summary>
         public bool ReuseAddress { get; set; } = false;
 
         /// <summary>
-        ///     The recorded statistics. This value will be empty unless <see cref="RecordNetworkStatistics"/> is enabled.
+        ///     The recorded statistics. This value will be empty unless <see cref="RecordNetworkStatistics" /> is enabled.
         /// </summary>
-        public NetStatistics Statistics { get; } = new NetStatistics();
+        public NetStatistics Statistics { get; } = new();
 
         /// <summary>
         ///     Whether to record network statistics for the manager and all known peers.
-        ///     If this value is true, <see cref="Statistics"/> will be updated with statistics information.
+        ///     If this value is true, <see cref="Statistics" /> will be updated with statistics information.
         /// </summary>
         public bool RecordNetworkStatistics { get; set; } = false;
 
@@ -146,7 +146,7 @@ namespace Promul.Common.Networking
         ///     that is, 576 bytes.
         /// </summary>
         public bool UseSafeMtu { get; set; } = false;
-        
+
         /// <summary>
         ///     Whether to disconnect peers if the host or network is unreachable.
         /// </summary>
@@ -157,7 +157,7 @@ namespace Promul.Common.Networking
         ///     when a device moves from an LTE connection to Wi-Fi, or vice versa.
         ///     This setting has safety implications.
         /// </summary>
-        public bool AllowPeerAddressChange { get; set; }= false;
+        public bool AllowPeerAddressChange { get; set; } = false;
 
         /// <summary>
         ///     The first peer that this manager has connected to.
@@ -165,7 +165,7 @@ namespace Promul.Common.Networking
         public PeerBase? FirstPeer => _headPeer;
 
         /// <summary>
-        /// QoS channel count per message type (value must be between 1 and 64 channels)
+        ///     QoS channel count per message type (value must be between 1 and 64 channels)
         /// </summary>
         public byte ChannelsCount
         {
@@ -191,15 +191,14 @@ namespace Promul.Common.Networking
             }
         }
 
+        internal int ExtraPacketSizeForLayer => _extraPacketLayer?.ExtraPacketSizeForLayer ?? 0;
+
         /// <summary>
         ///     Gets a peer by ID.
         /// </summary>
         public PeerBase? GetPeerById(int id)
         {
-            if (id >= 0 && id < _peersArray.Length)
-            {
-                return _peersArray[id];
-            }
+            if (id >= 0 && id < _peersArray.Length) return _peersArray[id];
 
             return null;
         }
@@ -215,11 +214,9 @@ namespace Promul.Common.Networking
             return tmp != null;
         }
 
-        internal int ExtraPacketSizeForLayer => _extraPacketLayer?.ExtraPacketSizeForLayer ?? 0;
-
         private bool TryGetPeer(IPEndPoint endPoint, out PeerBase peer)
         {
-            bool result = _peers.TryGetValue(endPoint, out peer);
+            var result = _peers.TryGetValue(endPoint, out peer);
             return result;
         }
 
@@ -230,15 +227,17 @@ namespace Promul.Common.Networking
                 peer.NextPeer = _headPeer;
                 _headPeer.PrevPeer = peer;
             }
+
             _headPeer = peer;
             _peers.Add(peer.EndPoint, peer);
             if (peer.Id >= _peersArray.Length)
             {
-                int newSize = _peersArray.Length * 2;
+                var newSize = _peersArray.Length * 2;
                 while (peer.Id >= newSize)
                     newSize *= 2;
                 Array.Resize(ref _peersArray, newSize);
             }
+
             _peersArray[peer.Id] = peer;
         }
 
@@ -264,19 +263,6 @@ namespace Promul.Common.Networking
             _peerIds.Enqueue(peer.Id);
         }
 
-        /// <summary>
-        ///     Creates a new <see cref="PromulManager"/>.
-        /// </summary>
-        /// <param name="extraPacketLayer">
-        ///     An extra packet processing layer, used for utilities like CRC checksum verification or encryption layers.
-        ///     All <see cref="PromulManager"/> instances connected together must have the same configured layers.
-        /// </param>
-        public PromulManager(PacketLayerBase? extraPacketLayer = null)
-        {
-            //NatPunchModule = new NatPunchModule(this);
-            _extraPacketLayer = extraPacketLayer;
-        }
-
         internal async Task ConnectionLatencyUpdated(PeerBase fromPeer, int latency)
         {
             if (OnNetworkLatencyUpdate != null) await OnNetworkLatencyUpdate(fromPeer, latency);
@@ -286,7 +272,7 @@ namespace Promul.Common.Networking
         {
             if (OnMessageDelivered != null) await OnMessageDelivered(fromPeer, userData);
         }
-        
+
 
         private async Task ProcessDelayedPackets()
         {
@@ -298,7 +284,7 @@ namespace Promul.Common.Networking
             await _pingSimulationSemaphore.WaitAsync();
             try
             {
-                for (int i = 0; i < _pingSimulationList.Count; i++)
+                for (var i = 0; i < _pingSimulationList.Count; i++)
                 {
                     var incomingData = _pingSimulationList[i];
                     if (incomingData.TimeWhenGet <= time)
@@ -311,7 +297,7 @@ namespace Promul.Common.Networking
             }
             finally
             {
-                _pingSimulationSemaphore.Release(); 
+                _pingSimulationSemaphore.Release();
             }
 #endif
         }
@@ -328,26 +314,24 @@ namespace Promul.Common.Networking
             }
 
             if (requestsToRemove == null) return;
-            foreach (var ipEndPoint in requestsToRemove)
-            {
-                _ntpRequests.TryRemove(ipEndPoint, out _);
-            }
+            foreach (var ipEndPoint in requestsToRemove) _ntpRequests.TryRemove(ipEndPoint, out _);
         }
 
         internal async Task<PeerBase?> OnConnectionRequestResolved(ConnectionRequest request, ArraySegment<byte> data)
         {
             PeerBase? peer = null;
-            
+
             if (request.Result == ConnectionRequestResult.RejectForce)
             {
                 if (data is { Array: not null, Count: > 0 })
                 {
                     var shutdownPacket = NetworkPacket.FromProperty(PacketProperty.Disconnect, data.Count);
                     shutdownPacket.ConnectionNumber = request.InternalPacket.ConnectionNumber;
-                    FastBitConverter.GetBytes(shutdownPacket.Data.Array, shutdownPacket.Data.Offset+1, request.InternalPacket.ConnectionTime);
+                    FastBitConverter.GetBytes(shutdownPacket.Data.Array, shutdownPacket.Data.Offset + 1,
+                        request.InternalPacket.ConnectionTime);
                     if (shutdownPacket.Data.Count >= NetConstants.PossibleMtu[0])
                         NetDebug.WriteError("[Peer] Disconnect additional data size more than MTU!");
-                    else data.CopyTo(shutdownPacket.Data.Array, shutdownPacket.Data.Offset+9);
+                    else data.CopyTo(shutdownPacket.Data.Array, shutdownPacket.Data.Offset + 9);
                     await RawSendAsync(shutdownPacket, request.RemoteEndPoint);
                 }
             }
@@ -359,10 +343,10 @@ namespace Promul.Common.Networking
                 }
                 else if (request.Result == ConnectionRequestResult.Reject)
                 {
-                    peer = new IncomingPeer(this, request.RemoteEndPoint, GetNextPeerId(), 
-                        request.InternalPacket.PeerId, request.InternalPacket.ConnectionTime, 
+                    peer = new IncomingPeer(this, request.RemoteEndPoint, GetNextPeerId(),
+                        request.InternalPacket.PeerId, request.InternalPacket.ConnectionTime,
                         request.InternalPacket.ConnectionNumber);
-                    
+
                     await peer.ShutdownAsync(data, false);
                     AddPeer(peer);
                     NetDebug.Write(NetLogLevel.Trace, "[NM] Peer connect reject.");
@@ -382,7 +366,7 @@ namespace Promul.Common.Networking
 
         private int GetNextPeerId()
         {
-            return _peerIds.TryDequeue(out int id) ? id : _lastPeerId++;
+            return _peerIds.TryDequeue(out var id) ? id : _lastPeerId++;
         }
 
         private async Task ProcessConnectRequest(
@@ -394,12 +378,13 @@ namespace Promul.Common.Networking
             if (peer != null)
             {
                 var processResult = await peer.ProcessReconnectionRequestAsync(connRequest);
-                NetDebug.Write($"ConnectRequest LastId: {peer.ConnectTime}, NewId: {connRequest.ConnectionTime}, EP: {remoteEndPoint}, Result: {processResult}");
+                NetDebug.Write(
+                    $"ConnectRequest LastId: {peer.ConnectTime}, NewId: {connRequest.ConnectionTime}, EP: {remoteEndPoint}, Result: {processResult}");
 
                 switch (processResult)
                 {
                     case ConnectRequestResult.Reconnection:
-                        await ForceDisconnectPeerAsync(peer, DisconnectReason.Reconnect, 0, null);
+                        await ForceDisconnectPeerAsync(peer, DisconnectReason.Reconnect);
                         RemovePeer(peer);
                         //go to new connection
                         break;
@@ -408,7 +393,7 @@ namespace Promul.Common.Networking
                         //go to new connection
                         break;
                     case ConnectRequestResult.P2PLose:
-                        await ForceDisconnectPeerAsync(peer, DisconnectReason.PeerToPeerConnection, 0, null);
+                        await ForceDisconnectPeerAsync(peer, DisconnectReason.PeerToPeerConnection);
                         RemovePeer(peer);
                         //go to new connection
                         break;
@@ -416,10 +401,12 @@ namespace Promul.Common.Networking
                         //no operations needed
                         return;
                 }
+
                 //ConnectRequestResult.NewConnection
                 //Set next connection number
-                if(processResult != ConnectRequestResult.P2PLose)
-                    connRequest.ConnectionNumber = (byte)((peer.ConnectionNumber + 1) % NetConstants.MaxConnectionNumber);
+                if (processResult != ConnectRequestResult.P2PLose)
+                    connRequest.ConnectionNumber =
+                        (byte)((peer.ConnectionNumber + 1) % NetConstants.MaxConnectionNumber);
                 //To reconnect peer
             }
 
@@ -431,250 +418,36 @@ namespace Promul.Common.Networking
                     req.UpdateRequest(connRequest);
                     return;
                 }
+
                 req = new ConnectionRequest(remoteEndPoint, connRequest, this);
                 _connectionRequests.Add(remoteEndPoint, req);
             }
+
             if (OnConnectionRequest != null) await OnConnectionRequest(req);
         }
 
-        private async Task OnMessageReceived(NetworkPacket packet, IPEndPoint remoteEndPoint)
-        {
-#if DEBUG
-            if (SimulatePacketLoss && _randomGenerator.NextDouble() * 100 < SimulatePacketLossChance)
-            {
-                //drop packet
-                return;
-            }
-            if (SimulateLatency)
-            {
-                int latency = _randomGenerator.Next(SimulationMinLatency, SimulationMaxLatency);
-                if (latency > MinLatencyThreshold)
-                {
-                    _pingSimulationList.Add(new IncomingData
-                    {
-                        Data = packet,
-                        EndPoint = remoteEndPoint,
-                        TimeWhenGet = DateTime.UtcNow.AddMilliseconds(latency)
-                    });
-                    
-                    return;
-                }
-            }
-
-            await DebugMessageReceived(packet, remoteEndPoint);
-        }
-
-        private async Task DebugMessageReceived(NetworkPacket packet, IPEndPoint remoteEndPoint)
-        {
-#endif
-            var originalPacketSize = packet.Data.Count;
-            if (RecordNetworkStatistics)
-            {
-                Statistics.IncrementPacketsReceived();
-                Statistics.AddBytesReceived(originalPacketSize);
-            }
-
-            if (_ntpRequests.Count > 0)
-            {
-                if (_ntpRequests.TryGetValue(remoteEndPoint, out var request))
-                {
-                    if (packet.Data.Count < 48)
-                    {
-                        NetDebug.Write(NetLogLevel.Trace, $"NTP response too short: {packet.Data.Count}");
-                        return;
-                    }
-
-                    var copiedData = packet.Data.ToArray();
-                    NtpPacket ntpPacket = NtpPacket.FromServerResponse(copiedData, DateTime.UtcNow);
-                    try
-                    {
-                        ntpPacket.ValidateReply();
-                    }
-                    catch (InvalidOperationException ex)
-                    {
-                        NetDebug.Write(NetLogLevel.Trace, $"NTP response error: {ex.Message}");
-                        ntpPacket = null;
-                    }
-
-                    if (ntpPacket != null)
-                    {
-                        _ntpRequests.TryRemove(remoteEndPoint, out _);
-                        if (OnNtpResponse != null) await OnNtpResponse(ntpPacket);
-                    }
-                    return;
-                }
-            }
-
-            if (_extraPacketLayer != null)
-            {
-                int start = 0;
-                _extraPacketLayer.ProcessInboundPacket(ref remoteEndPoint, ref packet);
-                if (packet.Data.Count == 0)
-                    return;
-            }
-
-            if (!packet.Verify())
-            {
-                NetDebug.WriteError("[NM] DataReceived: bad!");
-                //PoolRecycle(packet);
-                return;
-            }
-
-            // For messages that don't use the peer topology,
-            // handle those before checking peers to save some cycles
-            switch (packet.Property)
-            {
-                case PacketProperty.Broadcast:
-                    if (!BroadcastMessagesAllowed) return;
-                    await OnConnectionlessReceive(remoteEndPoint, packet.CreateReader(packet.GetHeaderSize()), UnconnectedMessageType.Broadcast);
-                    return;
-                case PacketProperty.UnconnectedMessage:
-                    if (!ConnectionlessMessagesAllowed) return;
-                    await OnConnectionlessReceive(remoteEndPoint, packet.CreateReader(packet.GetHeaderSize()), UnconnectedMessageType.BasicMessage);
-                    return;
-                // TODO: NAT punching
-            }
-
-            var peerFound = _peers.TryGetValue(remoteEndPoint, out var memoryPeer);
-
-            if (peerFound && RecordNetworkStatistics)
-            {
-                memoryPeer!.Statistics.IncrementPacketsReceived();
-                memoryPeer.Statistics.AddBytesReceived(originalPacketSize);
-            }
-            
-            switch (packet.Property)
-            {
-                // Handle connection requests
-                case PacketProperty.ConnectRequest:
-                    if (NetConnectRequestPacket.GetProtocolId(packet) != NetConstants.ProtocolId)
-                    {
-                        await RawSendAsync(NetworkPacket.FromProperty(PacketProperty.InvalidProtocol, 0), remoteEndPoint);
-                        return;
-                    }
-                    var connRequest = NetConnectRequestPacket.FromData(packet);
-                    if (connRequest != null) await ProcessConnectRequest(remoteEndPoint, memoryPeer, connRequest);
-                    break;
-                case PacketProperty.PeerNotFound:
-                    if (peerFound)
-                    {
-                        if (memoryPeer!.ConnectionState != ConnectionState.Connected)
-                            return;
-                        if (packet.Data.Count == 1)
-                        {
-                            //first reply
-                            //send NetworkChanged packet
-                            memoryPeer.ResetMtu();
-                            await RawSendAsync(NetConnectAcceptPacket.MakeNetworkChanged(memoryPeer), remoteEndPoint);
-                            NetDebug.Write($"PeerNotFound sending connection info: {remoteEndPoint}");
-                        }
-                        else if (packet.Data.Count == 2 && packet.Data.Array[packet.Data.Offset+1] == 1)
-                        {
-                            //second reply
-                            await ForceDisconnectPeerAsync(memoryPeer, DisconnectReason.PeerNotFound, 0, null);
-                        }
-                    }
-                    else if (packet.Data.Count > 1) //remote
-                    {
-                        //check if this is old peer
-                        bool isOldPeer = false;
-
-                        if (AllowPeerAddressChange)
-                        {
-                            NetDebug.Write($"[NM] Looks like address change: {packet.Data.Count}");
-                            var remoteData = NetConnectAcceptPacket.FromData(packet);
-                            if (remoteData != null &&
-                                remoteData.PeerNetworkChanged &&
-                                remoteData.PeerId < _peersArray.Length)
-                            {
-                                var peer = _peersArray[remoteData.PeerId];
-                                if (peer != null &&
-                                    peer.ConnectTime == remoteData.ConnectionTime &&
-                                    peer.ConnectionNumber == remoteData.ConnectionNumber)
-                                {
-                                    if (peer.ConnectionState == ConnectionState.Connected)
-                                    {
-                                        peer.InitiateEndPointChange();
-                                        if (OnPeerAddressChanged != null) await OnPeerAddressChanged(peer, remoteEndPoint);
-                                        NetDebug.Write("[NM] PeerNotFound change address of remote peer");
-                                    }
-                                    isOldPeer = true;
-                                }
-                            }
-                        }
-
-                        //else peer really not found
-                        if (!isOldPeer)
-                        {
-                            var secondResponse = NetworkPacket.FromProperty(PacketProperty.PeerNotFound, 1);
-                            secondResponse.Data.Array[secondResponse.Data.Offset+1] = 1;
-                            await RawSendAsync(secondResponse, remoteEndPoint);
-                        }
-                    }
-                    break;
-                // Remote rejected us because we sent an invalid protocol ID
-                case PacketProperty.InvalidProtocol:
-                    if (peerFound && memoryPeer!.ConnectionState == ConnectionState.Outgoing)
-                        await ForceDisconnectPeerAsync(memoryPeer, DisconnectReason.InvalidProtocol, 0, null);
-                    break;
-                case PacketProperty.Disconnect:
-                    if (peerFound)
-                    {
-                        var disconnectResult = memoryPeer!.ProcessDisconnect(packet);
-                        if (disconnectResult == DisconnectResult.None)
-                        {
-                            return;
-                        }
-                        await ForceDisconnectPeerAsync(
-                            memoryPeer,
-                            disconnectResult == DisconnectResult.Disconnect
-                            ? DisconnectReason.RemoteConnectionClose
-                            : DisconnectReason.ConnectionRejected,
-                            0, packet);
-                    }
-                    
-                    await RawSendAsync(NetworkPacket.FromProperty(PacketProperty.ShutdownOk, 0), remoteEndPoint);
-                    break;
-                case PacketProperty.ConnectAccept:
-                    if (!peerFound) return;
-                    var connAccept = NetConnectAcceptPacket.FromData(packet);
-                    if (connAccept != null && memoryPeer is OutgoingPeer op && op.ProcessConnectionAccepted(connAccept))
-                    {
-                        if (OnPeerConnected != null) await OnPeerConnected(memoryPeer);
-                    }
-                    break;
-                default:
-                    if (peerFound) await memoryPeer!.ProcessPacket(packet);
-                    else
-                    {
-                        NetDebug.Write($"Unknown peer attempted to send {packet.Property} with {packet.Data.Count} bytes of data.");
-                        await RawSendAsync(NetworkPacket.FromProperty(PacketProperty.PeerNotFound, 0), remoteEndPoint);   
-                    }
-                    break;
-            }
-        }
-
-        internal async Task CreateReceiveEvent(NetworkPacket packet, DeliveryMethod method, byte channelNumber, int headerSize, PeerBase fromPeer)
+        internal async Task CreateReceiveEvent(NetworkPacket packet, DeliveryMethod method, byte channelNumber,
+            int headerSize, PeerBase fromPeer)
         {
             if (OnReceive != null) await OnReceive(fromPeer, packet.CreateReader(headerSize), channelNumber, method);
         }
-        
+
         /// <summary>
         ///     Sends data to all connected peers using the given channel and delivery method.
-        ///     If <see cref="excludePeer"/> is set, all peers excluding that specific peer will
+        ///     If <see cref="excludePeer" /> is set, all peers excluding that specific peer will
         ///     receive the information.
         /// </summary>
         /// <param name="data">The data to send.</param>
-        /// <param name="channelNumber">The channel number. This can range from 0 to <see cref="ChannelsCount"/> - 1.</param>
+        /// <param name="channelNumber">The channel number. This can range from 0 to <see cref="ChannelsCount" /> - 1.</param>
         /// <param name="options">The delivery method to utilise.</param>
         /// <param name="excludePeer">The (optional) peer to exclude from receiving this information.</param>
-        public async Task SendToAllAsync(ArraySegment<byte> data, DeliveryMethod options = DeliveryMethod.ReliableOrdered, byte channelNumber = 0, PeerBase? excludePeer = null)
+        public async Task SendToAllAsync(ArraySegment<byte> data,
+            DeliveryMethod options = DeliveryMethod.ReliableOrdered, byte channelNumber = 0,
+            PeerBase? excludePeer = null)
         {
             for (var peer = _headPeer; peer != null; peer = peer.NextPeer)
-            {
                 if (peer != excludePeer)
                     await peer.SendAsync(data, options, channelNumber);
-            }
         }
 
 
@@ -712,6 +485,7 @@ namespace Promul.Common.Networking
                     case ConnectionState.Outgoing:
                         return peer;
                 }
+
                 //else reconnect
                 connectionNumber = (byte)((peer.ConnectionNumber + 1) % NetConstants.MaxConnectionNumber);
                 RemovePeer(peer);
@@ -737,10 +511,11 @@ namespace Promul.Common.Networking
 #endif
 
             // Disconnect all peers
-            for (var peer = _headPeer; peer != null; peer = peer.NextPeer) await peer.ShutdownAsync(null, !sendDisconnectMessages);
+            for (var peer = _headPeer; peer != null; peer = peer.NextPeer)
+                await peer.ShutdownAsync(null, !sendDisconnectMessages);
 
             CloseSocket();
-            
+
             _headPeer = null;
             _peers.Clear();
             _peersArray = new PeerBase[32];
@@ -759,12 +534,10 @@ namespace Promul.Common.Networking
         /// <returns>The number of peers who are in the given state.</returns>
         public int GetNumberOfPeersInState(ConnectionState peerState)
         {
-            int count = 0;
+            var count = 0;
             for (var peer = _headPeer; peer != null; peer = peer.NextPeer)
-            {
                 if ((peer.ConnectionState & peerState) != 0)
                     count++;
-            }
             return count;
         }
 
@@ -777,32 +550,31 @@ namespace Promul.Common.Networking
         {
             peers.Clear();
             for (var peer = _headPeer; peer != null; peer = peer.NextPeer)
-            {
                 if ((peer.ConnectionState & peerState) != 0)
                     peers.Add(peer);
-            }
         }
 
         /// <summary>
         ///     Gracefully disconnects all peers.
         /// </summary>
-        /// <param name="data">The shutdown message to be sent to each peer.
-        /// As only one message is sent, the size of this data must be less than or equal to the current MTU.</param>
+        /// <param name="data">
+        ///     The shutdown message to be sent to each peer.
+        ///     As only one message is sent, the size of this data must be less than or equal to the current MTU.
+        /// </param>
         public async Task DisconnectAllPeersAsync(ArraySegment<byte> data = default)
         {
             //Send disconnect packets
-            for (var peer = _headPeer; peer != null; peer = peer.NextPeer)
-            {
-                await DisconnectPeerAsync(peer, data);
-            }
+            for (var peer = _headPeer; peer != null; peer = peer.NextPeer) await DisconnectPeerAsync(peer, data);
         }
 
         /// <summary>
         ///     Gracefully disconnects a given peer.
         /// </summary>
         /// <param name="peer">The peer to disconnect.</param>
-        /// <param name="data">The shutdown message to be sent to each peer.
-        /// As only one message is sent, the size of this data must be less than or equal to the current MTU.</param>
+        /// <param name="data">
+        ///     The shutdown message to be sent to each peer.
+        ///     As only one message is sent, the size of this data must be less than or equal to the current MTU.
+        /// </param>
         public Task DisconnectPeerAsync(PeerBase peer, ArraySegment<byte> data = default)
         {
             return DisconnectPeerInternalAsync(
@@ -821,14 +593,14 @@ namespace Promul.Common.Networking
         /// <param name="reason">The reason for disconnection.</param>
         /// <param name="errorCode">The socket error code.</param>
         /// <param name="data"></param>
-        public Task ForceDisconnectPeerAsync(PeerBase peer, 
+        public Task ForceDisconnectPeerAsync(PeerBase peer,
             DisconnectReason reason = DisconnectReason.DisconnectPeerCalled,
-            SocketError errorCode = 0, 
+            SocketError errorCode = 0,
             NetworkPacket? data = null)
         {
             return DisconnectPeerInternalAsync(peer, reason, errorCode, true, null, data);
         }
-        
+
         private async Task DisconnectPeerInternalAsync(
             PeerBase peer,
             DisconnectReason reason,
@@ -849,11 +621,16 @@ namespace Promul.Common.Networking
                 default:
                     break;
             }
-            if (OnPeerDisconnected != null) await OnPeerDisconnected(peer, new DisconnectInfo { Reason = reason, 
-                SocketErrorCode = socketErrorCode,
-                AdditionalData = eventData?.CreateReader(eventData?.GetHeaderSize() ?? 0) });
+
+            if (OnPeerDisconnected != null)
+                await OnPeerDisconnected(peer, new DisconnectInfo
+                {
+                    Reason = reason,
+                    SocketErrorCode = socketErrorCode,
+                    AdditionalData = eventData?.CreateReader(eventData?.GetHeaderSize() ?? 0)
+                });
         }
-        
+
         /// <summary>
         ///     Creates a NTP request for a given address and port.
         /// </summary>
@@ -863,6 +640,241 @@ namespace Promul.Common.Networking
         {
             var endPoint = NetUtils.MakeEndPoint(ntpServerAddress, NtpRequest.DefaultPort);
             _ntpRequests.TryAdd(endPoint, new NtpRequest(endPoint));
+        }
+#if DEBUG
+        private struct IncomingData
+        {
+            public NetworkPacket Data;
+            public IPEndPoint EndPoint;
+            public DateTime TimeWhenGet;
+        }
+
+        private readonly SemaphoreSlim _pingSimulationSemaphore = new(1, 1);
+        private readonly List<IncomingData> _pingSimulationList = new();
+        private readonly Random _randomGenerator = new();
+        private const int MinLatencyThreshold = 5;
+#endif
+
+        private async Task OnMessageReceived(NetworkPacket packet, IPEndPoint remoteEndPoint)
+        {
+#if DEBUG
+            if (SimulatePacketLoss && _randomGenerator.NextDouble() * 100 < SimulatePacketLossChance)
+                //drop packet
+                return;
+            if (SimulateLatency)
+            {
+                var latency = _randomGenerator.Next(SimulationMinLatency, SimulationMaxLatency);
+                if (latency > MinLatencyThreshold)
+                {
+                    _pingSimulationList.Add(new IncomingData
+                    {
+                        Data = packet,
+                        EndPoint = remoteEndPoint,
+                        TimeWhenGet = DateTime.UtcNow.AddMilliseconds(latency)
+                    });
+
+                    return;
+                }
+            }
+
+            await DebugMessageReceived(packet, remoteEndPoint);
+        }
+
+        private async Task DebugMessageReceived(NetworkPacket packet, IPEndPoint remoteEndPoint)
+        {
+#endif
+            var originalPacketSize = packet.Data.Count;
+            if (RecordNetworkStatistics)
+            {
+                Statistics.IncrementPacketsReceived();
+                Statistics.AddBytesReceived(originalPacketSize);
+            }
+
+            if (_ntpRequests.Count > 0)
+                if (_ntpRequests.TryGetValue(remoteEndPoint, out var request))
+                {
+                    if (packet.Data.Count < 48)
+                    {
+                        NetDebug.Write(NetLogLevel.Trace, $"NTP response too short: {packet.Data.Count}");
+                        return;
+                    }
+
+                    var copiedData = packet.Data.ToArray();
+                    var ntpPacket = NtpPacket.FromServerResponse(copiedData, DateTime.UtcNow);
+                    try
+                    {
+                        ntpPacket.ValidateReply();
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        NetDebug.Write(NetLogLevel.Trace, $"NTP response error: {ex.Message}");
+                        ntpPacket = null;
+                    }
+
+                    if (ntpPacket != null)
+                    {
+                        _ntpRequests.TryRemove(remoteEndPoint, out _);
+                        if (OnNtpResponse != null) await OnNtpResponse(ntpPacket);
+                    }
+
+                    return;
+                }
+
+            if (_extraPacketLayer != null)
+            {
+                var start = 0;
+                _extraPacketLayer.ProcessInboundPacket(ref remoteEndPoint, ref packet);
+                if (packet.Data.Count == 0)
+                    return;
+            }
+
+            if (!packet.Verify())
+            {
+                NetDebug.WriteError("[NM] DataReceived: bad!");
+                //PoolRecycle(packet);
+                return;
+            }
+
+            // For messages that don't use the peer topology,
+            // handle those before checking peers to save some cycles
+            switch (packet.Property)
+            {
+                case PacketProperty.Broadcast:
+                    if (!BroadcastMessagesAllowed) return;
+                    await OnConnectionlessReceive(remoteEndPoint, packet.CreateReader(packet.GetHeaderSize()),
+                        UnconnectedMessageType.Broadcast);
+                    return;
+                case PacketProperty.UnconnectedMessage:
+                    if (!ConnectionlessMessagesAllowed) return;
+                    await OnConnectionlessReceive(remoteEndPoint, packet.CreateReader(packet.GetHeaderSize()),
+                        UnconnectedMessageType.BasicMessage);
+                    return;
+                // TODO: NAT punching
+            }
+
+            var peerFound = _peers.TryGetValue(remoteEndPoint, out var memoryPeer);
+
+            if (peerFound && RecordNetworkStatistics)
+            {
+                memoryPeer!.Statistics.IncrementPacketsReceived();
+                memoryPeer.Statistics.AddBytesReceived(originalPacketSize);
+            }
+
+            switch (packet.Property)
+            {
+                // Handle connection requests
+                case PacketProperty.ConnectRequest:
+                    if (NetConnectRequestPacket.GetProtocolId(packet) != NetConstants.ProtocolId)
+                    {
+                        await RawSendAsync(NetworkPacket.FromProperty(PacketProperty.InvalidProtocol, 0),
+                            remoteEndPoint);
+                        return;
+                    }
+
+                    var connRequest = NetConnectRequestPacket.FromData(packet);
+                    if (connRequest != null) await ProcessConnectRequest(remoteEndPoint, memoryPeer, connRequest);
+                    break;
+                case PacketProperty.PeerNotFound:
+                    if (peerFound)
+                    {
+                        if (memoryPeer!.ConnectionState != ConnectionState.Connected)
+                            return;
+                        if (packet.Data.Count == 1)
+                        {
+                            //first reply
+                            //send NetworkChanged packet
+                            memoryPeer.ResetMtu();
+                            await RawSendAsync(NetConnectAcceptPacket.MakeNetworkChanged(memoryPeer), remoteEndPoint);
+                            NetDebug.Write($"PeerNotFound sending connection info: {remoteEndPoint}");
+                        }
+                        else if (packet.Data.Count == 2 && packet.Data.Array[packet.Data.Offset + 1] == 1)
+                        {
+                            //second reply
+                            await ForceDisconnectPeerAsync(memoryPeer, DisconnectReason.PeerNotFound);
+                        }
+                    }
+                    else if (packet.Data.Count > 1) //remote
+                    {
+                        //check if this is old peer
+                        var isOldPeer = false;
+
+                        if (AllowPeerAddressChange)
+                        {
+                            NetDebug.Write($"[NM] Looks like address change: {packet.Data.Count}");
+                            var remoteData = NetConnectAcceptPacket.FromData(packet);
+                            if (remoteData != null &&
+                                remoteData.PeerNetworkChanged &&
+                                remoteData.PeerId < _peersArray.Length)
+                            {
+                                var peer = _peersArray[remoteData.PeerId];
+                                if (peer != null &&
+                                    peer.ConnectTime == remoteData.ConnectionTime &&
+                                    peer.ConnectionNumber == remoteData.ConnectionNumber)
+                                {
+                                    if (peer.ConnectionState == ConnectionState.Connected)
+                                    {
+                                        peer.InitiateEndPointChange();
+                                        if (OnPeerAddressChanged != null)
+                                            await OnPeerAddressChanged(peer, remoteEndPoint);
+                                        NetDebug.Write("[NM] PeerNotFound change address of remote peer");
+                                    }
+
+                                    isOldPeer = true;
+                                }
+                            }
+                        }
+
+                        //else peer really not found
+                        if (!isOldPeer)
+                        {
+                            var secondResponse = NetworkPacket.FromProperty(PacketProperty.PeerNotFound, 1);
+                            secondResponse.Data.Array[secondResponse.Data.Offset + 1] = 1;
+                            await RawSendAsync(secondResponse, remoteEndPoint);
+                        }
+                    }
+
+                    break;
+                // Remote rejected us because we sent an invalid protocol ID
+                case PacketProperty.InvalidProtocol:
+                    if (peerFound && memoryPeer!.ConnectionState == ConnectionState.Outgoing)
+                        await ForceDisconnectPeerAsync(memoryPeer, DisconnectReason.InvalidProtocol);
+                    break;
+                case PacketProperty.Disconnect:
+                    if (peerFound)
+                    {
+                        var disconnectResult = memoryPeer!.ProcessDisconnect(packet);
+                        if (disconnectResult == DisconnectResult.None) return;
+                        await ForceDisconnectPeerAsync(
+                            memoryPeer,
+                            disconnectResult == DisconnectResult.Disconnect
+                                ? DisconnectReason.RemoteConnectionClose
+                                : DisconnectReason.ConnectionRejected,
+                            0, packet);
+                    }
+
+                    await RawSendAsync(NetworkPacket.FromProperty(PacketProperty.ShutdownOk, 0), remoteEndPoint);
+                    break;
+                case PacketProperty.ConnectAccept:
+                    if (!peerFound) return;
+                    var connAccept = NetConnectAcceptPacket.FromData(packet);
+                    if (connAccept != null && memoryPeer is OutgoingPeer op && op.ProcessConnectionAccepted(connAccept))
+                        if (OnPeerConnected != null)
+                            await OnPeerConnected(memoryPeer);
+                    break;
+                default:
+                    if (peerFound)
+                    {
+                        await memoryPeer!.ProcessPacket(packet);
+                    }
+                    else
+                    {
+                        NetDebug.Write(
+                            $"Unknown peer attempted to send {packet.Property} with {packet.Data.Count} bytes of data.");
+                        await RawSendAsync(NetworkPacket.FromProperty(PacketProperty.PeerNotFound, 0), remoteEndPoint);
+                    }
+
+                    break;
+            }
         }
     }
 }

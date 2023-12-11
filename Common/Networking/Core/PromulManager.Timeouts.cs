@@ -25,24 +25,20 @@ namespace Promul.Common.Networking
                     {
                         if (e.ConnectionState == ConnectionState.Disconnected &&
                             e.TimeSinceLastPacket > DisconnectTimeout)
-                        {
                             peersToRemove.Add(e);
-                        }
                         else
-                        {
                             await e.Update(deltaTime);
-                        }
                     }
 
                     await Task.WhenAll(_peersArray.Where(e => e != null).Select(tick));
-    
+
                     if (peersToRemove.Count > 0)
                     {
-                        for (int i = 0; i < peersToRemove.Count; i++)
+                        for (var i = 0; i < peersToRemove.Count; i++)
                             RemovePeerInternal(peersToRemove[i]);
                         peersToRemove.Clear();
                     }
-    
+
                     ProcessNtpRequests(deltaTime);
                 }
                 catch (ThreadAbortException)

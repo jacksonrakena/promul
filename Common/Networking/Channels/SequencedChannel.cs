@@ -7,14 +7,16 @@ namespace Promul.Common.Networking.Channels
 {
     internal sealed class SequencedChannel : ChannelBase
     {
-        private int _localSequence;
-        private ushort _remoteSequence;
+        private readonly NetworkPacket? _ackPacket;
+        private readonly byte _id;
+
+        private readonly SemaphoreSlim _outgoingQueueSem = new(1, 1);
         private readonly bool _reliable;
         private NetworkPacket? _lastPacket;
-        private readonly NetworkPacket? _ackPacket;
-        private bool _mustSendAck;
-        private readonly byte _id;
         private long _lastPacketSendTime;
+        private int _localSequence;
+        private bool _mustSendAck;
+        private ushort _remoteSequence;
 
         public SequencedChannel(PeerBase peer, bool reliable, byte id) : base(peer)
         {
@@ -27,13 +29,12 @@ namespace Promul.Common.Networking.Channels
             }
         }
 
-        private readonly SemaphoreSlim _outgoingQueueSem = new SemaphoreSlim(1, 1);
         protected override async Task<bool> FlushQueueAsync()
         {
             if (_reliable && OutgoingQueue.Count == 0)
             {
-                long currentTime = DateTime.UtcNow.Ticks;
-                long packetHoldTime = currentTime - _lastPacketSendTime;
+                var currentTime = DateTime.UtcNow.Ticks;
+                var packetHoldTime = currentTime - _lastPacketSendTime;
                 if (packetHoldTime >= Peer.ResendDelay * TimeSpan.TicksPerMillisecond)
                 {
                     var packet = _lastPacket;
@@ -50,7 +51,7 @@ namespace Promul.Common.Networking.Channels
 
                 while (OutgoingQueue.Count > 0)
                 {
-                    NetworkPacket packet = OutgoingQueue.Dequeue();
+                    var packet = OutgoingQueue.Dequeue();
                     _localSequence = (_localSequence + 1) % NetConstants.MaxSequence;
                     packet.Sequence = (ushort)_localSequence;
                     packet.ChannelId = _id;
@@ -61,12 +62,9 @@ namespace Promul.Common.Networking.Channels
                         _lastPacketSendTime = DateTime.UtcNow.Ticks;
                         _lastPacket = packet;
                     }
-                    else
-                    {
-                        //Peer.NetManager.PoolRecycle(packet);
-                    }
+                    //Peer.NetManager.PoolRecycle(packet);
                 }
-                
+
                 _outgoingQueueSem.Release();
             }
 
@@ -90,8 +88,9 @@ namespace Promul.Common.Networking.Channels
                     _lastPacket = null;
                 return false;
             }
-            int relative = NetUtils.RelativeSequenceNumber(packet.Sequence, _remoteSequence);
-            bool packetProcessed = false;
+
+            var relative = NetUtils.RelativeSequenceNumber(packet.Sequence, _remoteSequence);
+            var packetProcessed = false;
             if (packet.Sequence < NetConstants.MaxSequence && relative > 0)
             {
                 if (Peer.PromulManager.RecordNetworkStatistics)

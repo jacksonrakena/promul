@@ -9,8 +9,8 @@ namespace Promul.Common.Networking
         private const int KillTimer = 10000;
         public const int DefaultPort = 123;
         private readonly IPEndPoint _ntpEndPoint;
+        private long _killTime;
         private long _resendTime = ResendTimer;
-        private long _killTime = 0;
 
         public NtpRequest(IPEndPoint endPoint)
         {
@@ -23,14 +23,11 @@ namespace Promul.Common.Networking
         {
             _resendTime += time;
             _killTime += time;
-            if (_resendTime < ResendTimer)
-            {
-                return false;
-            }
+            if (_resendTime < ResendTimer) return false;
             var packet = new NtpPacket();
             try
             {
-                int sendCount = socket.SendTo(packet.Bytes, 0, packet.Bytes.Length, SocketFlags.None, _ntpEndPoint);
+                var sendCount = socket.SendTo(packet.Bytes, 0, packet.Bytes.Length, SocketFlags.None, _ntpEndPoint);
                 return sendCount == packet.Bytes.Length;
             }
             catch

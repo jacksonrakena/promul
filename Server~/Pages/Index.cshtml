@@ -30,14 +30,14 @@
         </tr>
         </thead>
         <tbody>
-            @foreach (var session in relayServer.GetAllSessions())
-            {
-                <tr>
-                    <td>@session.Key</td>
-                    <td>@session.Value.Peers.Count()</td>
-                    <td>@(session.Value.HostPeer?.EndPoint?.ToString() ?? "None assigned")</td>
-                </tr>
-            }
+        @foreach (var session in relayServer.GetAllSessions())
+        {
+            <tr>
+                <td>@session.Key</td>
+                <td>@session.Value.Peers.Count()</td>
+                <td>@(session.Value.HostPeer?.EndPoint?.ToString() ?? "None assigned")</td>
+            </tr>
+        }
         </tbody>
     </table>
 </div>

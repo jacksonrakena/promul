@@ -3,8 +3,8 @@ namespace Promul.Common.Networking.Packets.Internal
     public abstract class ConnectPacketBase
     {
         public readonly long ConnectionTime;
-        public byte ConnectionNumber;
         public readonly int PeerId;
+        public byte ConnectionNumber;
 
         public ConnectPacketBase(long connectionTime, byte connectionNumber, int peerId)
         {

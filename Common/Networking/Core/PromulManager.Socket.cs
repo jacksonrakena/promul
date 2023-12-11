@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
@@ -76,20 +75,21 @@ namespace Promul.Common.Networking
                     if (OnNetworkError != null) await OnNetworkError(null, ex.SocketErrorCode);
                     break;
             }
+
             return false;
         }
-        
+
         private async Task ReceiveInternalAsync(Socket s, EndPoint bufferEndPoint, CancellationToken ct = default)
         {
             var receiveBuffer = new byte[NetConstants.MaxPacketSize];
             var receive = await s.ReceiveFromAsync(receiveBuffer, SocketFlags.None, bufferEndPoint);
             var packet = NetworkPacket.FromBuffer(new ArraySegment<byte>(receiveBuffer, 0, receive.ReceivedBytes));
-            await OnMessageReceived(packet, (IPEndPoint) receive.RemoteEndPoint);
+            await OnMessageReceived(packet, (IPEndPoint)receive.RemoteEndPoint);
         }
 
         /// <summary>
         ///     Begins listening on all available and configured interfaces.
-        ///     This method will block until the <see cref="CancellationToken"/> is cancelled.
+        ///     This method will block until the <see cref="CancellationToken" /> is cancelled.
         /// </summary>
         /// <param name="cancellationToken">The cancellation token used to stop the listen operation.</param>
         public async Task ListenAsync(CancellationToken cancellationToken = default)
@@ -98,22 +98,17 @@ namespace Promul.Common.Networking
             EndPoint bufferEndPoint6 = new IPEndPoint(IPAddress.IPv6Any, 0);
 
             _ = PeerUpdateLoopBlockingAsync(cancellationToken);
-            
+
             while (!cancellationToken.IsCancellationRequested)
-            {
                 try
                 {
                     if (_udpSocketv6 == null)
-                    {
                         await ReceiveInternalAsync(_udpSocketv4, bufferEndPoint4, cancellationToken);
-                    }
                     else
-                    {
                         await Task.WhenAll(
-                            ReceiveInternalAsync(_udpSocketv4, bufferEndPoint4, cancellationToken), 
+                            ReceiveInternalAsync(_udpSocketv4, bufferEndPoint4, cancellationToken),
                             ReceiveInternalAsync(_udpSocketv6, bufferEndPoint6, cancellationToken)
                         );
-                    }
                 }
                 catch (SocketException ex)
                 {
@@ -133,9 +128,8 @@ namespace Promul.Common.Networking
                 catch (Exception e)
                 {
                     //protects socket receive thread
-                    NetDebug.WriteError("[NM] SocketReceiveThread error: " + e );
+                    NetDebug.WriteError("[NM] SocketReceiveThread error: " + e);
                 }
-            }
         }
 
         /// <summary>
@@ -155,13 +149,14 @@ namespace Promul.Common.Networking
             if (!BindInternal(_udpSocketv4, new IPEndPoint(addressIPv4, port)))
                 return false;
 
-            LocalPort = ((IPEndPoint) _udpSocketv4.LocalEndPoint).Port;
+            LocalPort = ((IPEndPoint)_udpSocketv4.LocalEndPoint).Port;
 
 #if UNITY_2018_3_OR_NEWER
             if (_pausedSocketFix == null)
-                _pausedSocketFix = new Promul.Common.Networking.PausedSocketFix(this, addressIPv4, addressIPv6, port, false);
+                _pausedSocketFix =
+ new Promul.Common.Networking.PausedSocketFix(this, addressIPv4, addressIPv6, port, false);
 #endif
-            
+
             //Check IPv6 support
             if (IPv6Support && Ipv6Enabled)
             {
@@ -175,7 +170,7 @@ namespace Promul.Common.Networking
                     _udpSocketv6 = null;
                 }
             }
-            
+
             return true;
         }
 
@@ -189,16 +184,14 @@ namespace Promul.Common.Networking
             socket.Blocking = true;
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
                 try
                 {
-                    socket.IOControl(SioUdpConnreset, new byte[] {0}, null);
+                    socket.IOControl(SioUdpConnreset, new byte[] { 0 }, null);
                 }
                 catch
                 {
                     //ignored
                 }
-            }
 
             try
             {
@@ -209,11 +202,15 @@ namespace Promul.Common.Networking
             {
                 //Unity with IL2CPP throws an exception here, it doesn't matter in most cases so just ignore it
             }
+
             if (ep.AddressFamily == AddressFamily.InterNetwork)
             {
                 Ttl = NetConstants.SocketTTL;
 
-                try { socket.EnableBroadcast = true; }
+                try
+                {
+                    socket.EnableBroadcast = true;
+                }
                 catch (SocketException e)
                 {
                     NetDebug.WriteError($"[B]Broadcast error: {e.SocketErrorCode}");
@@ -228,14 +225,14 @@ namespace Promul.Common.Networking
                     // }
                 }
             }
+
             //Bind
             try
             {
                 socket.Bind(ep);
-                
+
                 //join multicast
                 if (ep.AddressFamily == AddressFamily.InterNetworkV6)
-                {
                     try
                     {
 #if !UNITY_2018_3_OR_NEWER
@@ -249,7 +246,6 @@ namespace Promul.Common.Networking
                     {
                         // Unity3d throws exception - ignored
                     }
-                }
             }
             catch (SocketException bindException)
             {
@@ -271,30 +267,35 @@ namespace Promul.Common.Networking
                                 NetDebug.WriteError($"[B]Bind exception: {ex}, errorCode: {ex.SocketErrorCode}");
                                 return false;
                             }
+
                             return true;
                         }
+
                         break;
                     //hack for iOS (Unity3D)
                     case SocketError.AddressFamilyNotSupported:
                         return true;
                 }
+
                 NetDebug.WriteError($"[B]Bind exception: {bindException}, errorCode: {bindException.SocketErrorCode}");
                 return false;
             }
+
             return true;
         }
-        
+
         /// <summary>
         ///     Sends arbitrary-sized data to the destination endpoint,
         ///     using an optional provided token.<br />
-        ///     This method will apply any networking layers configured in <see cref="PromulManager"/>.<br />
+        ///     This method will apply any networking layers configured in <see cref="PromulManager" />.<br />
         ///     This method is at the bottom of the protocol infrastructure, and sends the data directly.
         /// </summary>
         /// <param name="data">The data to send.</param>
         /// <param name="remoteEndPoint">The remote endpoint to send to.</param>
         /// <param name="ct">The cancellation token used to cancel the send operation.</param>
         /// <returns>The number of bytes sent.</returns>
-        internal async Task<int> RawSendAsync(ArraySegment<byte> data, IPEndPoint remoteEndPoint, CancellationToken ct = default)
+        internal async Task<int> RawSendAsync(ArraySegment<byte> data, IPEndPoint remoteEndPoint,
+            CancellationToken ct = default)
         {
             var socket = _udpSocketv4;
             if (remoteEndPoint.AddressFamily == AddressFamily.InterNetworkV6 && IPv6Support)
@@ -303,7 +304,7 @@ namespace Promul.Common.Networking
                 if (socket == null) return 0;
             }
 
-            int result = 0;
+            var result = 0;
             try
             {
                 result = await socket.SendToAsync(data, SocketFlags.None, remoteEndPoint);
@@ -322,15 +323,12 @@ namespace Promul.Common.Networking
                     case SocketError.HostUnreachable:
                     case SocketError.NetworkUnreachable:
                         if (DisconnectOnUnreachable && TryGetPeer(remoteEndPoint, out var fromPeer))
-                        {
                             await ForceDisconnectPeerAsync(
                                 fromPeer,
                                 ex.SocketErrorCode == SocketError.HostUnreachable
                                     ? DisconnectReason.HostUnreachable
                                     : DisconnectReason.NetworkUnreachable,
-                                ex.SocketErrorCode,
-                                null);
-                        }
+                                ex.SocketErrorCode);
 
                         if (OnNetworkError != null) await OnNetworkError(remoteEndPoint, ex.SocketErrorCode);
                         return 0;
@@ -357,7 +355,7 @@ namespace Promul.Common.Networking
                     Statistics.AddBytesSent(result);
                 }
             }
-            
+
             return result;
         }
 
@@ -367,12 +365,13 @@ namespace Promul.Common.Networking
             if (_extraPacketLayer != null)
             {
                 var headerSize = NetworkPacket.GetHeaderSize(PacketProperty.Broadcast);
-                packet = NetworkPacket.FromProperty(PacketProperty.Broadcast, data.Count + _extraPacketLayer.ExtraPacketSizeForLayer);
-                
-                data.CopyTo(packet.Data.Array, packet.Data.Offset+headerSize);
+                packet = NetworkPacket.FromProperty(PacketProperty.Broadcast,
+                    data.Count + _extraPacketLayer.ExtraPacketSizeForLayer);
+
+                data.CopyTo(packet.Data.Array, packet.Data.Offset + headerSize);
                 //Buffer.BlockCopy(data.Array, data.Offset, packet.Data, headerSize, data.Count);
                 var checksumComputeStart = 0;
-                int preCrcLength = data.Count + headerSize;
+                var preCrcLength = data.Count + headerSize;
                 IPEndPoint emptyEp = null;
                 _extraPacketLayer.ProcessOutBoundPacket(ref emptyEp, ref packet);
             }
@@ -382,8 +381,8 @@ namespace Promul.Common.Networking
                 packet.Property = PacketProperty.Broadcast;
             }
 
-            bool broadcastSuccess = false;
-            bool multicastSuccess = false;
+            var broadcastSuccess = false;
+            var multicastSuccess = false;
             try
             {
                 broadcastSuccess = await _udpSocketv4.SendToAsync(
@@ -392,25 +391,20 @@ namespace Promul.Common.Networking
                     new IPEndPoint(IPAddress.Broadcast, port)) > 0;
 
                 if (_udpSocketv6 != null)
-                {
                     multicastSuccess = await _udpSocketv6.SendToAsync(
                         packet,
                         SocketFlags.None,
                         new IPEndPoint(MulticastAddressV6, port)) > 0;
-                }
             }
             catch (Exception ex)
             {
                 NetDebug.WriteError($"[S][MCAST] {ex}");
                 return broadcastSuccess;
             }
-            finally
-            {
-                //PoolRecycle(packet);
-            }
 
             return broadcastSuccess || multicastSuccess;
         }
+
         public void CloseSocket()
         {
             _udpSocketv4?.Close();

@@ -1,7 +1,7 @@
 namespace Promul.Common.Networking.Data
 {
     /// <summary>
-    /// Disconnect reason that you receive in OnPeerDisconnected event
+    ///     Disconnect reason that you receive in OnPeerDisconnected event
     /// </summary>
     public enum DisconnectReason
     {

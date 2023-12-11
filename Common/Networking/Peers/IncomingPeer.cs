@@ -1,4 +1,3 @@
-using System;
 using System.Net;
 using System.Threading.Tasks;
 using Promul.Common.Networking.Packets;
@@ -9,7 +8,7 @@ namespace Promul.Common.Networking
     public class IncomingPeer : PeerBase
     {
         private readonly NetworkPacket _connectAcceptPacket;
-        
+
         internal IncomingPeer(PromulManager promulManager, IPEndPoint remote, int id, int remoteId,
             long connectTime, byte connectionNumber)
             : base(promulManager, remote, id, connectTime, connectionNumber)
@@ -24,7 +23,8 @@ namespace Promul.Common.Networking
             await PromulManager.RawSendAsync(_connectAcceptPacket, EndPoint);
         }
 
-        internal override async Task<ConnectRequestResult> ProcessReconnectionRequestAsync(NetConnectRequestPacket connRequest)
+        internal override async Task<ConnectRequestResult> ProcessReconnectionRequestAsync(
+            NetConnectRequestPacket connRequest)
         {
             switch (ConnectionState)
             {
@@ -33,10 +33,7 @@ namespace Promul.Common.Networking
                 case ConnectionState.Connected:
                     if (connRequest.ConnectionTime == ConnectTime)
                         await SendAcceptedConnectionAsync();
-                    else if (connRequest.ConnectionTime > ConnectTime)
-                    {
-                        return ConnectRequestResult.Reconnection;
-                    }
+                    else if (connRequest.ConnectionTime > ConnectTime) return ConnectRequestResult.Reconnection;
                     break;
 
                 case ConnectionState.Disconnected:
@@ -45,6 +42,7 @@ namespace Promul.Common.Networking
                         return ConnectRequestResult.NewConnection;
                     break;
             }
+
             return ConnectRequestResult.None;
         }
     }

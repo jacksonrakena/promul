@@ -1,4 +1,5 @@
 using Promul.Server.Relay;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.

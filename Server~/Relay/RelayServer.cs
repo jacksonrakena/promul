@@ -7,14 +7,13 @@ namespace Promul.Server.Relay;
 
 public class RelayServer
 {
-    public PromulManager PromulManager { get; }
+    private readonly ILoggerFactory _factory;
 
-    readonly Dictionary<string, RelaySession> _sessionsByCode = new Dictionary<string, RelaySession>();
-    readonly Dictionary<int, RelaySession> _sessionsByPeer = new Dictionary<int, RelaySession>();
+    private readonly ILogger<RelayServer> _logger;
 
-    readonly ILogger<RelayServer> _logger;
-    readonly ILoggerFactory _factory;
-    
+    private readonly Dictionary<string, RelaySession> _sessionsByCode = new();
+    private readonly Dictionary<int, RelaySession> _sessionsByPeer = new();
+
     public RelayServer(ILogger<RelayServer> logger, ILoggerFactory factory)
     {
         _logger = logger;
@@ -28,7 +27,12 @@ public class RelayServer
         PromulManager.OnPeerDisconnected += OnPeerDisconnected;
     }
 
-    public Dictionary<string, RelaySession> GetAllSessions() => _sessionsByCode;
+    public PromulManager PromulManager { get; }
+
+    public Dictionary<string, RelaySession> GetAllSessions()
+    {
+        return _sessionsByCode;
+    }
 
     public void CreateSession(string joinCode)
     {
@@ -39,19 +43,17 @@ public class RelayServer
     {
         return _sessionsByCode.GetValueOrDefault(joinCode);
     }
-    
+
     public async Task DestroySession(RelaySession session)
     {
-        foreach (var peer in session.Peers)
-        {
-            _sessionsByPeer.Remove(peer.Id);
-        }
-        
+        foreach (var peer in session.Peers) _sessionsByPeer.Remove(peer.Id);
+
         await session.DisconnectAll();
         _sessionsByCode.Remove(session.JoinCode);
     }
 
-    public async Task OnNetworkReceive(PeerBase peer, CompositeReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
+    public async Task OnNetworkReceive(PeerBase peer, CompositeReader reader, byte channelNumber,
+        DeliveryMethod deliveryMethod)
     {
         var packet = reader.ReadRelayControlMessage();
 
@@ -65,15 +67,16 @@ public class RelayServer
 
         await session.OnReceive(peer, packet, deliveryMethod);
     }
-    
+
     public async Task OnConnectionRequest(ConnectionRequest request)
     {
         var joinCode = request.Data.ReadString();
-        
+
         if (!_sessionsByCode.TryGetValue(joinCode, out var keyedSession))
         {
             const string format = "Rejecting {} because {}";
-            _logger.LogInformation(format, request.RemoteEndPoint, "because they requested to join a session that does not exist.");
+            _logger.LogInformation(format, request.RemoteEndPoint,
+                "because they requested to join a session that does not exist.");
             await request.RejectAsync(force: true);
             return;
         }
@@ -82,14 +85,16 @@ public class RelayServer
         await keyedSession.OnJoinAsync(peer);
         _sessionsByPeer[peer.Id] = keyedSession;
     }
-    
+
     public async Task OnPeerConnected(PeerBase peer)
     {
         _logger.LogInformation($"Connected to {peer.EndPoint}");
     }
+
     public async Task OnPeerDisconnected(PeerBase peer, DisconnectInfo disconnectInfo)
     {
-        _logger.LogInformation($"Peer {peer.Id} disconnected: {disconnectInfo.Reason} {disconnectInfo.SocketErrorCode}");
+        _logger.LogInformation(
+            $"Peer {peer.Id} disconnected: {disconnectInfo.Reason} {disconnectInfo.SocketErrorCode}");
         if (_sessionsByPeer.TryGetValue(peer.Id, out var session))
         {
             await session.OnLeave(peer);

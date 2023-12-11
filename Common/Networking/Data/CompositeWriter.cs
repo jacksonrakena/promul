@@ -1,10 +1,12 @@
 ﻿using System;
 using System.IO;
+
 namespace Promul.Common.Networking.Data
 {
     public class CompositeWriter : BinaryWriter
     {
-        readonly MemoryStream _ms;
+        private readonly MemoryStream _ms;
+
         private CompositeWriter(MemoryStream memory) : base(memory)
         {
             _ms = memory;

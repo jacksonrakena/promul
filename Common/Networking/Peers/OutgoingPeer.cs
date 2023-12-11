@@ -10,6 +10,7 @@ namespace Promul.Common.Networking
     public class OutgoingPeer : PeerBase
     {
         private readonly NetworkPacket _connectRequestPacket;
+
         public OutgoingPeer(PromulManager manager, IPEndPoint remote, int id, long connectTime, byte connectionNumber,
             ArraySegment<byte> data)
             : base(manager, remote, id, connectTime, connectionNumber)
@@ -24,7 +25,7 @@ namespace Promul.Common.Networking
         {
             await PromulManager.RawSendAsync(_connectRequestPacket, EndPoint);
         }
-        
+
         internal bool ProcessConnectionAccepted(NetConnectAcceptPacket packet)
         {
             if (ConnectionState != ConnectionState.Outgoing)
@@ -33,9 +34,11 @@ namespace Promul.Common.Networking
             //check connection id
             if (packet.ConnectionTime != ConnectTime)
             {
-                NetDebug.Write(NetLogLevel.Trace, $"[NC] Invalid connectId: {packet.ConnectionTime} != our({ConnectTime})");
+                NetDebug.Write(NetLogLevel.Trace,
+                    $"[NC] Invalid connectId: {packet.ConnectionTime} != our({ConnectTime})");
                 return false;
             }
+
             //check connect num
             ConnectionNumber = packet.ConnectionNumber;
             RemoteId = packet.PeerId;
@@ -45,46 +48,40 @@ namespace Promul.Common.Networking
             return true;
         }
 
-        internal override async Task<ConnectRequestResult> ProcessReconnectionRequestAsync(NetConnectRequestPacket connRequest)
+        internal override async Task<ConnectRequestResult> ProcessReconnectionRequestAsync(
+            NetConnectRequestPacket connRequest)
         {
             switch (ConnectionState)
             {
                 //P2P case
                 case ConnectionState.Outgoing:
                     //fast check
-                    if (connRequest.ConnectionTime < ConnectTime)
-                    {
-                        return ConnectRequestResult.P2PLose;
-                    }
+                    if (connRequest.ConnectionTime < ConnectTime) return ConnectRequestResult.P2PLose;
                     //slow rare case check
                     if (connRequest.ConnectionTime == ConnectTime)
                     {
                         var remoteBytes = EndPoint.Serialize();
                         var localBytes = connRequest.TargetAddress;
-                        for (int i = remoteBytes.Size-1; i >= 0; i--)
+                        for (var i = remoteBytes.Size - 1; i >= 0; i--)
                         {
-                            byte rb = remoteBytes[i];
+                            var rb = remoteBytes[i];
                             if (rb == localBytes[i])
                                 continue;
                             if (rb < localBytes[i])
                                 return ConnectRequestResult.P2PLose;
                         }
                     }
+
                     break;
 
                 case ConnectionState.Connected:
                     // Old connect request
                     if (connRequest.ConnectionTime == ConnectTime)
-                    {
                         NetDebug.Write($"Received connection request while in Connected state from {Id}");
-                        //just reply accept
-                        //await PromulManager.SendRaw(_connectAcceptPacket, EndPoint);
-                    }
+                    //just reply accept
+                    //await PromulManager.SendRaw(_connectAcceptPacket, EndPoint);
                     // New connect request
-                    else if (connRequest.ConnectionTime > ConnectTime)
-                    {
-                        return ConnectRequestResult.Reconnection;
-                    }
+                    else if (connRequest.ConnectionTime > ConnectTime) return ConnectRequestResult.Reconnection;
                     break;
 
                 case ConnectionState.Disconnected:
@@ -93,6 +90,7 @@ namespace Promul.Common.Networking
                         return ConnectRequestResult.NewConnection;
                     break;
             }
+
             return ConnectRequestResult.None;
         }
     }

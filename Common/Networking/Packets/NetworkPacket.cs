@@ -1,6 +1,4 @@
 ﻿using System;
-using System.IO;
-using System.Linq;
 using Promul.Common.Networking.Data;
 using Promul.Common.Networking.Packets.Internal;
 
@@ -32,16 +30,10 @@ namespace Promul.Common.Networking.Packets
         private static readonly int PropertiesCount = Enum.GetValues(typeof(PacketProperty)).Length;
         private static readonly int[] HeaderSizes;
 
-        public static implicit operator ArraySegment<byte>(NetworkPacket ndw)
-        {
-            return ndw.Data;
-        }
-
         static NetworkPacket()
         {
             HeaderSizes = NetUtils.AllocatePinnedUninitializedArray<int>(PropertiesCount);
-            for (int i = 0; i < HeaderSizes.Length; i++)
-            {
+            for (var i = 0; i < HeaderSizes.Length; i++)
                 switch ((PacketProperty)i)
                 {
                     case PacketProperty.Channeled:
@@ -67,7 +59,17 @@ namespace Promul.Common.Networking.Packets
                         HeaderSizes[i] = NetConstants.HeaderSize;
                         break;
                 }
-            }
+        }
+
+        private NetworkPacket(ArraySegment<byte> data)
+        {
+            Data = data;
+        }
+
+        private NetworkPacket(ArraySegment<byte> data, PacketProperty property)
+        {
+            Data = data;
+            Property = property;
         }
 
         //Header
@@ -80,57 +82,52 @@ namespace Promul.Common.Networking.Packets
         public byte ConnectionNumber
         {
             get => (byte)((Data[0] & 0x60) >> 5);
-            set => Data.Array[Data.Offset] = (byte) ((Data[0] & 0x9F) | (value << 5));
+            set => Data.Array[Data.Offset] = (byte)((Data[0] & 0x9F) | (value << 5));
         }
 
         public ushort Sequence
         {
             get => BitConverter.ToUInt16(Data[Range.StartAt(1)]);
-            set => FastBitConverter.GetBytes(Data.Array, Data.Offset+1, value);
+            set => FastBitConverter.GetBytes(Data.Array, Data.Offset + 1, value);
         }
 
         public bool IsFragmented => (Data[0] & 0x80) != 0;
 
-        public void MarkFragmented()
-        {
-            Data.Array[Data.Offset] |= 0x80; //set first bit
-        }
-
         public byte ChannelId
         {
             get => Data[3];
-            set => Data.Array[Data.Offset+3] = value;
+            set => Data.Array[Data.Offset + 3] = value;
         }
 
         public ushort FragmentId
         {
             get => BitConverter.ToUInt16(Data[Range.StartAt(4)]);
-            set => FastBitConverter.GetBytes(Data.Array, Data.Offset+4, value);
+            set => FastBitConverter.GetBytes(Data.Array, Data.Offset + 4, value);
         }
 
         public ushort FragmentPart
         {
             get => BitConverter.ToUInt16(Data[Range.StartAt(6)]);
-            set => FastBitConverter.GetBytes(Data.Array, Data.Offset+6, value);
+            set => FastBitConverter.GetBytes(Data.Array, Data.Offset + 6, value);
         }
 
         public ushort FragmentsTotal
         {
             get => BitConverter.ToUInt16(Data[Range.StartAt(8)]);
-            set => FastBitConverter.GetBytes(Data.Array, Data.Offset+8, value);
+            set => FastBitConverter.GetBytes(Data.Array, Data.Offset + 8, value);
         }
 
         //Data
         public ArraySegment<byte> Data { get; }
 
-        private NetworkPacket(ArraySegment<byte> data)
+        public static implicit operator ArraySegment<byte>(NetworkPacket ndw)
         {
-            Data = data;
+            return ndw.Data;
         }
-        private NetworkPacket(ArraySegment<byte> data, PacketProperty property)
+
+        public void MarkFragmented()
         {
-            Data = data;
-            Property = property;
+            Data.Array[Data.Offset] |= 0x80; //set first bit
         }
 
         public static NetworkPacket FromBuffer(ArraySegment<byte> data)
@@ -140,7 +137,7 @@ namespace Promul.Common.Networking.Packets
 
         public static NetworkPacket FromProperty(PacketProperty property, int size)
         {
-            return new NetworkPacket(new byte[size+GetHeaderSize(property)], property);
+            return new NetworkPacket(new byte[size + GetHeaderSize(property)], property);
         }
 
         public static int GetHeaderSize(PacketProperty property)
@@ -155,12 +152,13 @@ namespace Promul.Common.Networking.Packets
 
         public bool Verify()
         {
-            byte property = (byte)(Data[0] & 0x1F);
+            var property = (byte)(Data[0] & 0x1F);
             if (property >= PropertiesCount)
                 return false;
-            int headerSize = HeaderSizes[property];
-            bool fragmented = (Data[0] & 0x80) != 0;
-            return Data.Count >= headerSize && (!fragmented || Data.Count >= headerSize + NetConstants.FragmentHeaderSize);
+            var headerSize = HeaderSizes[property];
+            var fragmented = (Data[0] & 0x80) != 0;
+            return Data.Count >= headerSize &&
+                   (!fragmented || Data.Count >= headerSize + NetConstants.FragmentHeaderSize);
         }
 
         public CompositeReader CreateReader(int headerSize)

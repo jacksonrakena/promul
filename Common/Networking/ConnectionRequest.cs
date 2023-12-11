@@ -21,7 +21,22 @@ namespace Promul.Common.Networking
     public class ConnectionRequest
     {
         private readonly PromulManager _listener;
+
+        /// <summary>
+        ///     The remote endpoint of the peer.
+        /// </summary>
+        public readonly IPEndPoint RemoteEndPoint;
+
         private int _used;
+        internal NetConnectRequestPacket InternalPacket;
+
+        internal ConnectionRequest(IPEndPoint remoteEndPoint, NetConnectRequestPacket requestPacket,
+            PromulManager listener)
+        {
+            InternalPacket = requestPacket;
+            RemoteEndPoint = remoteEndPoint;
+            _listener = listener;
+        }
 
         /// <summary>
         ///     The data sent by the remote peer.
@@ -29,12 +44,6 @@ namespace Promul.Common.Networking
         public BinaryReader Data => InternalPacket.Data;
 
         internal ConnectionRequestResult Result { get; private set; }
-        internal NetConnectRequestPacket InternalPacket;
-
-        /// <summary>
-        ///     The remote endpoint of the peer.
-        /// </summary>
-        public readonly IPEndPoint RemoteEndPoint;
 
         internal void UpdateRequest(NetConnectRequestPacket connectRequest)
         {
@@ -54,15 +63,8 @@ namespace Promul.Common.Networking
             return Interlocked.CompareExchange(ref _used, 1, 0) == 0;
         }
 
-        internal ConnectionRequest(IPEndPoint remoteEndPoint, NetConnectRequestPacket requestPacket, PromulManager listener)
-        {
-            InternalPacket = requestPacket;
-            RemoteEndPoint = remoteEndPoint;
-            _listener = listener;
-        }
-
         /// <summary>
-        ///     Accepts the connection if the contained data is a <see cref="string"/> and matches <see cref="key"/> exactly.
+        ///     Accepts the connection if the contained data is a <see cref="string" /> and matches <see cref="key" /> exactly.
         /// </summary>
         /// <param name="key">The key to compare the data to.</param>
         /// <returns>Null, if the request was rejected. Otherwise, the connected peer.</returns>
@@ -78,6 +80,7 @@ namespace Promul.Common.Networking
             {
                 NetDebug.WriteError("[AC] Invalid incoming data");
             }
+
             if (Result == ConnectionRequestResult.Accept)
                 return await _listener.OnConnectionRequestResolved(this, null);
 

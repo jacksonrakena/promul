@@ -1,17 +1,17 @@
 {
-    "name": "Promul.Runtime",
-    "rootNamespace": "Promul.Runtime",
-    "references": [
-        "GUID:1a708d929450cf244aefd140b1190d9a",
-        "Unity.Netcode.Runtime"
-    ],
-    "includePlatforms": [],
-    "excludePlatforms": [],
-    "allowUnsafeCode": false,
-    "overrideReferences": false,
-    "precompiledReferences": [],
-    "autoReferenced": true,
-    "defineConstraints": [],
-    "versionDefines": [],
-    "noEngineReferences": false
+  "name": "Promul.Runtime",
+  "rootNamespace": "Promul.Runtime",
+  "references": [
+    "GUID:1a708d929450cf244aefd140b1190d9a",
+    "Unity.Netcode.Runtime"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
 }

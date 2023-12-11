@@ -1,5 +1,3 @@
-using System;
-using System.IO;
 using Promul.Common.Networking.Data;
 
 namespace Promul.Common.Structs
@@ -10,12 +8,13 @@ namespace Promul.Common.Structs
         {
             var rcm = new RelayControlMessage
             {
-                Type = (RelayControlMessageType) reader.ReadByte(),
+                Type = (RelayControlMessageType)reader.ReadByte(),
                 AuthorClientId = reader.ReadUInt64(),
                 Data = reader.ReadRemainingBytes()
             };
             return rcm;
         }
+
         public static void Write(this CompositeWriter writer, RelayControlMessage rcm)
         {
             writer.Write((byte)rcm.Type);

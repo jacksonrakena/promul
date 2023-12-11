@@ -3,7 +3,7 @@ using System.Net;
 
 namespace Promul.Common.Networking
 {
-    class IPEndPointComparer : IEqualityComparer<IPEndPoint>
+    internal class IPEndPointComparer : IEqualityComparer<IPEndPoint>
     {
         public bool Equals(IPEndPoint x, IPEndPoint y)
         {

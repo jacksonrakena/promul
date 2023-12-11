@@ -12,9 +12,10 @@ namespace Promul.Common.Networking.Layers
             ExtraPacketSizeForLayer = extraPacketSizeForLayer;
         }
 
-        public abstract void ProcessInboundPacket(ref IPEndPoint endPoint, 
+        public abstract void ProcessInboundPacket(ref IPEndPoint endPoint,
             ref NetworkPacket data);
-        public abstract void ProcessOutBoundPacket(ref IPEndPoint endPoint, 
+
+        public abstract void ProcessOutBoundPacket(ref IPEndPoint endPoint,
             ref NetworkPacket data);
     }
 }

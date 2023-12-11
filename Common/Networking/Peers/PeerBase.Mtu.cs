@@ -7,7 +7,7 @@ namespace Promul.Common.Networking
     public partial class PeerBase
     {
         /// <summary>
-        ///     Handles all packets of type <see cref="PacketProperty.MtuOk"/> and <see cref="PacketProperty.MtuCheck"/>.
+        ///     Handles all packets of type <see cref="PacketProperty.MtuOk" /> and <see cref="PacketProperty.MtuCheck" />.
         /// </summary>
         private async Task ProcessMtuPacketAsync(NetworkPacket packet)
         {
@@ -64,7 +64,8 @@ namespace Promul.Common.Networking
                 case PacketProperty.MtuOk when frontCheck > MaximumTransferUnit && !_mtuNegotiationComplete:
                 {
                     // Validate the packet.
-                    if (frontCheck != NetConstants.PossibleMtu[_currentMtuIndex + 1] - PromulManager.ExtraPacketSizeForLayer)
+                    if (frontCheck != NetConstants.PossibleMtu[_currentMtuIndex + 1] -
+                        PromulManager.ExtraPacketSizeForLayer)
                         return;
 
                     await _mtuMutex.WaitAsync();
@@ -83,7 +84,10 @@ namespace Promul.Common.Networking
                         _mtuNegotiationComplete = true;
                         NetDebug.Write($"[MTU] Negotiation complete. MTU for this session: {MaximumTransferUnit}.");
                     }
-                    else NetDebug.Write("[MTU] MTU confirm acknowledged. Setting MTU to " + MaximumTransferUnit);
+                    else
+                    {
+                        NetDebug.Write("[MTU] MTU confirm acknowledged. Setting MTU to " + MaximumTransferUnit);
+                    }
 
                     break;
                 }
@@ -117,8 +121,8 @@ namespace Promul.Common.Networking
                 if (_currentMtuIndex >= NetConstants.PossibleMtu.Length - 1)
                     return;
 
-                int newMtu = NetConstants.PossibleMtu[_currentMtuIndex + 1] - PromulManager.ExtraPacketSizeForLayer;
-                
+                var newMtu = NetConstants.PossibleMtu[_currentMtuIndex + 1] - PromulManager.ExtraPacketSizeForLayer;
+
                 // The new MTU packet must be the EXACT size of the requested MTU, so we
                 // subtract 1 to account for the header
                 var p = NetworkPacket.FromProperty(PacketProperty.MtuCheck, newMtu - 1);

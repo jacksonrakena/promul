@@ -8,7 +8,7 @@ using System.Net.Sockets;
 namespace Promul.Common.Networking
 {
     /// <summary>
-    /// Address type that you want to receive from NetUtils.GetLocalIp method
+    ///     Address type that you want to receive from NetUtils.GetLocalIp method
     /// </summary>
     [Flags]
     public enum LocalAddrType
@@ -19,11 +19,13 @@ namespace Promul.Common.Networking
     }
 
     /// <summary>
-    /// Some specific network utilities
+    ///     Some specific network utilities
     /// </summary>
     public static class NetUtils
     {
-        private static readonly NetworkSorter NetworkSorter = new NetworkSorter();
+        private static readonly NetworkSorter NetworkSorter = new();
+
+        private static readonly List<string> IpList = new();
 
         public static IPEndPoint MakeEndPoint(string hostStr, int port)
         {
@@ -32,7 +34,7 @@ namespace Promul.Common.Networking
 
         public static IPAddress ResolveAddress(string hostStr)
         {
-            if(hostStr == "localhost")
+            if (hostStr == "localhost")
                 return IPAddress.Loopback;
 
             if (!IPAddress.TryParse(hostStr, out var ipAddress))
@@ -42,6 +44,7 @@ namespace Promul.Common.Networking
                 if (ipAddress == null)
                     ipAddress = ResolveAddress(hostStr, AddressFamily.InterNetwork);
             }
+
             if (ipAddress == null)
                 throw new ArgumentException("Invalid address: " + hostStr);
 
@@ -51,37 +54,33 @@ namespace Promul.Common.Networking
         public static IPAddress ResolveAddress(string hostStr, AddressFamily addressFamily)
         {
             IPAddress[] addresses = Dns.GetHostEntry(hostStr).AddressList;
-            foreach (IPAddress ip in addresses)
-            {
+            foreach (var ip in addresses)
                 if (ip.AddressFamily == addressFamily)
-                {
                     return ip;
-                }
-            }
             return null;
         }
 
         /// <summary>
-        /// Get all local ip addresses
+        ///     Get all local ip addresses
         /// </summary>
         /// <param name="addrType">type of address (IPv4, IPv6 or both)</param>
         /// <returns>List with all local ip addresses</returns>
         public static List<string> GetLocalIpList(LocalAddrType addrType)
         {
-            List<string> targetList = new List<string>();
+            var targetList = new List<string>();
             GetLocalIpList(targetList, addrType);
             return targetList;
         }
 
         /// <summary>
-        /// Get all local ip addresses (non alloc version)
+        ///     Get all local ip addresses (non alloc version)
         /// </summary>
         /// <param name="targetList">result list</param>
         /// <param name="addrType">type of address (IPv4, IPv6 or both)</param>
         public static void GetLocalIpList(IList<string> targetList, LocalAddrType addrType)
         {
-            bool ipv4 = (addrType & LocalAddrType.IPv4) == LocalAddrType.IPv4;
-            bool ipv6 = (addrType & LocalAddrType.IPv6) == LocalAddrType.IPv6;
+            var ipv4 = (addrType & LocalAddrType.IPv4) == LocalAddrType.IPv4;
+            var ipv6 = (addrType & LocalAddrType.IPv6) == LocalAddrType.IPv6;
             try
             {
                 // Sort networks interfaces so it prefer Wifi over Cellular networks
@@ -89,7 +88,7 @@ namespace Promul.Common.Networking
                 var networks = NetworkInterface.GetAllNetworkInterfaces();
                 Array.Sort(networks, NetworkSorter);
 
-                foreach (NetworkInterface ni in networks)
+                foreach (var ni in networks)
                 {
                     //Skip loopback and disabled network interfaces
                     if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback ||
@@ -102,7 +101,7 @@ namespace Promul.Common.Networking
                     if (ipProps.GatewayAddresses.Count == 0)
                         continue;
 
-                    foreach (UnicastIPAddressInformation ip in ipProps.UnicastAddresses)
+                    foreach (var ip in ipProps.UnicastAddresses)
                     {
                         var address = ip.Address;
                         if ((ipv4 && address.AddressFamily == AddressFamily.InterNetwork) ||
@@ -111,17 +110,15 @@ namespace Promul.Common.Networking
                     }
                 }
 
-	            //Fallback mode (unity android)
-	            if (targetList.Count == 0)
-	            {
-	                IPAddress[] addresses = Dns.GetHostEntry(Dns.GetHostName()).AddressList;
-	                foreach (IPAddress ip in addresses)
-	                {
-	                    if((ipv4 && ip.AddressFamily == AddressFamily.InterNetwork) ||
-	                       (ipv6 && ip.AddressFamily == AddressFamily.InterNetworkV6))
-	                        targetList.Add(ip.ToString());
-	                }
-	            }
+                //Fallback mode (unity android)
+                if (targetList.Count == 0)
+                {
+                    IPAddress[] addresses = Dns.GetHostEntry(Dns.GetHostName()).AddressList;
+                    foreach (var ip in addresses)
+                        if ((ipv4 && ip.AddressFamily == AddressFamily.InterNetwork) ||
+                            (ipv6 && ip.AddressFamily == AddressFamily.InterNetworkV6))
+                            targetList.Add(ip.ToString());
+                }
             }
             catch
             {
@@ -130,16 +127,15 @@ namespace Promul.Common.Networking
 
             if (targetList.Count == 0)
             {
-                if(ipv4)
+                if (ipv4)
                     targetList.Add("127.0.0.1");
-                if(ipv6)
+                if (ipv6)
                     targetList.Add("::1");
             }
         }
 
-        private static readonly List<string> IpList = new List<string>();
         /// <summary>
-        /// Get first detected local ip address
+        ///     Get first detected local ip address
         /// </summary>
         /// <param name="addrType">type of address (IPv4, IPv6 or both)</param>
         /// <returns>IP address if available. Else - string.Empty</returns>
@@ -158,22 +154,16 @@ namespace Promul.Common.Networking
         // ===========================================
         internal static void PrintInterfaceInfos()
         {
-            NetDebug.WriteForce(NetLogLevel.Info, $"IPv6Support: { PromulManager.IPv6Support}");
+            NetDebug.WriteForce(NetLogLevel.Info, $"IPv6Support: {PromulManager.IPv6Support}");
             try
             {
-                foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())
-                {
-                    foreach (UnicastIPAddressInformation ip in ni.GetIPProperties().UnicastAddresses)
-                    {
-                        if (ip.Address.AddressFamily == AddressFamily.InterNetwork ||
-                            ip.Address.AddressFamily == AddressFamily.InterNetworkV6)
-                        {
-                            NetDebug.WriteForce(
-                                NetLogLevel.Info,
-                                $"Interface: {ni.Name}, Type: {ni.NetworkInterfaceType}, Ip: {ip.Address}, OpStatus: {ni.OperationalStatus}");
-                        }
-                    }
-                }
+                foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+                foreach (var ip in ni.GetIPProperties().UnicastAddresses)
+                    if (ip.Address.AddressFamily == AddressFamily.InterNetwork ||
+                        ip.Address.AddressFamily == AddressFamily.InterNetworkV6)
+                        NetDebug.WriteForce(
+                            NetLogLevel.Info,
+                            $"Interface: {ni.Name}, Type: {ni.NetworkInterfaceType}, Ip: {ip.Address}, OpStatus: {ni.OperationalStatus}");
             }
             catch (Exception e)
             {
@@ -183,7 +173,8 @@ namespace Promul.Common.Networking
 
         internal static int RelativeSequenceNumber(int number, int expected)
         {
-            return (number - expected + NetConstants.MaxSequence + NetConstants.HalfMaxSequence) % NetConstants.MaxSequence - NetConstants.HalfMaxSequence;
+            return (number - expected + NetConstants.MaxSequence + NetConstants.HalfMaxSequence) %
+                NetConstants.MaxSequence - NetConstants.HalfMaxSequence;
         }
 
         internal static T[] AllocatePinnedUninitializedArray<T>(int count) where T : unmanaged
@@ -211,8 +202,8 @@ namespace Promul.Common.Networking
                               b.NetworkInterfaceType == NetworkInterfaceType.Wwanpp ||
                               b.NetworkInterfaceType == NetworkInterfaceType.Wwanpp2;
 
-            var isWifiA     = a.NetworkInterfaceType == NetworkInterfaceType.Wireless80211;
-            var isWifiB     = b.NetworkInterfaceType == NetworkInterfaceType.Wireless80211;
+            var isWifiA = a.NetworkInterfaceType == NetworkInterfaceType.Wireless80211;
+            var isWifiB = b.NetworkInterfaceType == NetworkInterfaceType.Wireless80211;
 
             var isEthernetA = a.NetworkInterfaceType == NetworkInterfaceType.Ethernet ||
                               a.NetworkInterfaceType == NetworkInterfaceType.Ethernet3Megabit ||
@@ -226,8 +217,8 @@ namespace Promul.Common.Networking
                               b.NetworkInterfaceType == NetworkInterfaceType.FastEthernetFx ||
                               b.NetworkInterfaceType == NetworkInterfaceType.FastEthernetT;
 
-            var isOtherA    = !isCellularA && !isWifiA && !isEthernetA;
-            var isOtherB    = !isCellularB && !isWifiB && !isEthernetB;
+            var isOtherA = !isCellularA && !isWifiA && !isEthernetA;
+            var isOtherB = !isCellularB && !isWifiB && !isEthernetB;
 
             var priorityA = isEthernetA ? 3 : isWifiA ? 2 : isOtherA ? 1 : 0;
             var priorityB = isEthernetB ? 3 : isWifiB ? 2 : isOtherB ? 1 : 0;

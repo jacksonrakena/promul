@@ -26,7 +26,7 @@ namespace Promul.Common.Networking
     }
 
     /// <summary>
-    /// Interface to implement for your own logger
+    ///     Interface to implement for your own logger
     /// </summary>
     public interface INetLogger
     {
@@ -34,13 +34,14 @@ namespace Promul.Common.Networking
     }
 
     /// <summary>
-    /// Static class for defining your own LiteNetLib logger instead of Console.WriteLine
-    /// or Debug.Log if compiled with UNITY flag
+    ///     Static class for defining your own LiteNetLib logger instead of Console.WriteLine
+    ///     or Debug.Log if compiled with UNITY flag
     /// </summary>
     public static class NetDebug
     {
         public static INetLogger Logger = null;
-        private static readonly object DebugLogLock = new object();
+        private static readonly object DebugLogLock = new();
+
         private static void WriteLogic(NetLogLevel logLevel, string str, params object[] args)
         {
             lock (DebugLogLock)
@@ -72,13 +73,15 @@ namespace Promul.Common.Networking
             WriteLogic(level, str);
         }
 
-        [Conditional("DEBUG_MESSAGES"), Conditional("DEBUG")]
+        [Conditional("DEBUG_MESSAGES")]
+        [Conditional("DEBUG")]
         internal static void WriteForce(string str)
         {
             WriteLogic(NetLogLevel.Trace, str);
         }
 
-        [Conditional("DEBUG_MESSAGES"), Conditional("DEBUG")]
+        [Conditional("DEBUG_MESSAGES")]
+        [Conditional("DEBUG")]
         internal static void WriteForce(NetLogLevel level, string str)
         {
             WriteLogic(level, str);

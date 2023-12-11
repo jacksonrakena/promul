@@ -1,14 +1,13 @@
 using System;
 using System.IO;
-using System.Linq;
-using System.Text;
 
 namespace Promul.Common.Networking.Data
 {
     public class CompositeReader : BinaryReader
     {
-        readonly MemoryStream _ms;
-        readonly ArraySegment<byte> _data;
+        private readonly ArraySegment<byte> _data;
+        private readonly MemoryStream _ms;
+
         private CompositeReader(MemoryStream memory, ArraySegment<byte> data) : base(memory)
         {
             _ms = memory;
@@ -17,7 +16,8 @@ namespace Promul.Common.Networking.Data
 
         public ArraySegment<byte> ReadRemainingBytes()
         {
-            return new ArraySegment<byte>(_data.Array, _data.Offset+(int)_ms.Position, (int)(_data.Count - _ms.Position));
+            return new ArraySegment<byte>(_data.Array, _data.Offset + (int)_ms.Position,
+                (int)(_data.Count - _ms.Position));
         }
 
         internal static CompositeReader Create(ArraySegment<byte> data)

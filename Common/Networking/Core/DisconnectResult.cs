@@ -6,12 +6,12 @@ namespace Promul.Common.Networking
     internal enum DisconnectResult
     {
         None,
-        
+
         /// <summary>
         ///     The connection was rejected.
         /// </summary>
         Reject,
-        
+
         /// <summary>
         ///     The connection was disconnected.
         /// </summary>

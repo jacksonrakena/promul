@@ -20,14 +20,14 @@
         </Reference>
     </ItemGroup>
     <ItemGroup>
-      <Content Include="com.fireworkeyes.netcode.transport.promul.asmdef" />
+        <Content Include="com.fireworkeyes.netcode.transport.promul.asmdef"/>
         <ProjectReference Include="..\Common\Promul.Common.csproj">
-          <Project>{009a3a68-30a0-44eb-9b42-8fcb6bd89195}</Project>
-          <Name>Promul.Common</Name>
+            <Project>{009a3a68-30a0-44eb-9b42-8fcb6bd89195}</Project>
+            <Name>Promul.Common</Name>
         </ProjectReference>
     </ItemGroup>
     <ItemGroup>
-      <Folder Include="Properties\" />
+        <Folder Include="Properties\"/>
     </ItemGroup>
 
 </Project>

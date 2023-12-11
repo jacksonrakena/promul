@@ -4,11 +4,11 @@ namespace Promul.Common.Networking
 {
     public sealed class NetStatistics
     {
-        private long _packetsSent;
-        private long _packetsReceived;
-        private long _bytesSent;
         private long _bytesReceived;
+        private long _bytesSent;
         private long _packetLoss;
+        private long _packetsReceived;
+        private long _packetsSent;
 
         public long PacketsSent => Interlocked.Read(ref _packetsSent);
         public long PacketsReceived => Interlocked.Read(ref _packetsReceived);
