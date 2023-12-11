@@ -25,6 +25,17 @@ Example:
 You should now be ready to use Promul as a relay server for your Unity project. You can call `NetworkManager`'s `StartHost`/`StartClient`/`StartServer` methods as normal.
 
 ## Engineering
+```mermaid
+flowchart TD
+    subgraph "Protocol layer"
+    A[Your Unity code] -->|Unity Netcode| B[Promul.Runtime]
+    end
+    subgraph Transit layer
+    B --> C[Promul.Common\nKey networking capabilities]
+    end
+    D[Promul.Server] -->|Relay server| C
+```
+
 ### Transit layer
 Promul's included networking solution is a very heavily modified version of the amazing [LibNetLib](https://github.com/RevenantX/LiteNetLib) by Ruslan Pyrch.
 
