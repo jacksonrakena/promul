@@ -40,7 +40,6 @@ namespace Promul.Common.Networking
             ConnectionNumber = packet.ConnectionNumber;
             RemoteId = packet.PeerId;
 
-            NetDebug.Write(NetLogLevel.Trace, "[NC] Received connection accept");
             Interlocked.Exchange(ref _timeSinceLastPacket, 0);
             ConnectionState = ConnectionState.Connected;
             return true;

@@ -340,7 +340,6 @@ namespace Promul.Common.Networking
             
             if (request.Result == ConnectionRequestResult.RejectForce)
             {
-                NetDebug.Write(NetLogLevel.Trace, "[NM] Peer connect reject force.");
                 if (data is { Array: not null, Count: > 0 })
                 {
                     var shutdownPacket = NetworkPacket.FromProperty(PacketProperty.Disconnect, data.Count);
@@ -373,7 +372,6 @@ namespace Promul.Common.Networking
                     peer = await PeerBase.AcceptAsync(this, request, GetNextPeerId());
                     AddPeer(peer);
                     if (OnPeerConnected != null) await OnPeerConnected(peer);
-                    NetDebug.Write(NetLogLevel.Trace, $"[NM] Received peer connection Id: {peer.ConnectTime}, EP: {peer.EndPoint}");
                 }
             }
 
@@ -424,10 +422,6 @@ namespace Promul.Common.Networking
                     connRequest.ConnectionNumber = (byte)((peer.ConnectionNumber + 1) % NetConstants.MaxConnectionNumber);
                 //To reconnect peer
             }
-            else
-            {
-                NetDebug.Write($"ConnectRequest Id: {connRequest.ConnectionTime}, EP: {remoteEndPoint}");
-            }
 
             ConnectionRequest req;
             lock (_connectionRequests)
@@ -440,7 +434,6 @@ namespace Promul.Common.Networking
                 req = new ConnectionRequest(remoteEndPoint, connRequest, this);
                 _connectionRequests.Add(remoteEndPoint, req);
             }
-            NetDebug.Write($"[NM] Creating request event: {connRequest.ConnectionTime}");
             if (OnConnectionRequest != null) await OnConnectionRequest(req);
         }
 

@@ -239,7 +239,6 @@ namespace Promul.Common.Networking
             var peer = new OutgoingPeer(manager, remote, id, time, connectionNumber, data);
 
             await peer.SendConnectionRequestAsync();
-            NetDebug.Write(NetLogLevel.Trace, $"[CC] Attempting connection to {peer.Id} at {peer.ConnectTime}");
             return peer;
         }
         
@@ -251,7 +250,6 @@ namespace Promul.Common.Networking
 
             await peer.SendAcceptedConnectionAsync();
 
-            NetDebug.Write(NetLogLevel.Trace, $"[CC] Accepted connection from {peer.Id}: {peer.ConnectTime}");
             return peer;
         }
 

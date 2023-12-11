@@ -232,8 +232,7 @@ namespace Promul.Common.Networking
             try
             {
                 socket.Bind(ep);
-                NetDebug.Write(NetLogLevel.Trace, $"[B]Successfully binded to port: {((IPEndPoint)socket.LocalEndPoint).Port}, AF: {socket.AddressFamily}");
-
+                
                 //join multicast
                 if (ep.AddressFamily == AddressFamily.InterNetworkV6)
                 {
