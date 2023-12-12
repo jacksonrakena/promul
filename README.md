@@ -27,13 +27,31 @@ You should now be ready to use Promul as a relay server for your Unity project. 
 ## Engineering
 ```mermaid
 flowchart TD
+    subgraph Unity
+    Code[Your Unity code] -->|Unity Netcode| Runtime[Promul.Runtime.Unity]
+    end
+
+    subgraph Unreal Engine
+    UECode[Your UE code] --> RuntimeUE["Promul.Runtime.Unreal\n(planned)"]
+    end
+
     subgraph "Protocol layer"
-    A[Your Unity code] -->|Unity Netcode| B[Promul.Runtime.Unity]
+    Protocol[Promul.Relay.Protocol]
     end
+    Protocol-->Core
+    Runtime-->Protocol
+        RuntimeUE-->Protocol
+    
+    subgraph Relay server
+    API[Promul.Server.API\nFront-facing]-->Server[Promul.Server]
+    Server-->Protocol
+    end
+
     subgraph Transit layer
-    B --> C[Promul.Common\nKey networking capabilities]
+    Core[Promul\nKey networking capabilities]
+    Core-->Native[Native sockets]
+    Core-->Managed[Managed sockets]
     end
-    D[Promul.Server] -->|Relay server| C
 ```
 
 ### Transit layer

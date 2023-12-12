@@ -20,10 +20,6 @@
     </ItemGroup>
     <ItemGroup>
         <Content Include="com.fireworkeyes.netcode.transport.promul.asmdef"/>
-        <ProjectReference Include="..\Promul\Promul.csproj">
-            <Project>{009a3a68-30a0-44eb-9b42-8fcb6bd89195}</Project>
-            <Name>Promul.Common</Name>
-        </ProjectReference>
         <ProjectReference Include="..\Promul.Relay.Protocol\Promul.Relay.Protocol.csproj" />
     </ItemGroup>
     <ItemGroup>
