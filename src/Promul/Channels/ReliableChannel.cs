@@ -59,7 +59,7 @@ namespace Promul
         {
             if (packet.Data.Count != _outgoingAcks.Data.Count)
             {
-                NetDebug.Write("[PA]Invalid acks packet size");
+                Peer.LogDebug("[PA]Invalid acks packet size");
                 return;
             }
 
@@ -67,14 +67,14 @@ namespace Promul
             var windowRel = NetUtils.RelativeSequenceNumber(_localWindowStart, ackWindowStart);
             if (ackWindowStart >= NetConstants.MaxSequence || windowRel < 0)
             {
-                NetDebug.Write("[PA]Bad window start");
+                Peer.LogDebug("[PA]Bad window start");
                 return;
             }
 
             //check relevance
             if (windowRel >= _windowSize)
             {
-                NetDebug.Write("[PA]Old acks");
+                Peer.LogDebug("[PA]Old acks");
                 return;
             }
 
@@ -352,7 +352,7 @@ namespace Promul
                     var resendDelay = peer.ResendDelay * TimeSpan.TicksPerMillisecond;
                     double packetHoldTime = utcNowTicks - _timeStamp!.Value;
                     if (packetHoldTime < resendDelay) return;
-                    NetDebug.Write($"[RC]Resend: {packetHoldTime} > {resendDelay}");
+                    peer.LogDebug($"[RC] Resend: {packetHoldTime} > {resendDelay}");
                 }
 
                 _timeStamp = utcNowTicks;

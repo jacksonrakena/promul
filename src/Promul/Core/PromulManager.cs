@@ -344,7 +344,6 @@ namespace Promul
 
                     await peer.ShutdownAsync(data, false);
                     AddPeer(peer);
-                    NetDebug.Write(NetLogLevel.Trace, "[NM] Peer connect reject.");
                 }
                 else // Accept
                 {

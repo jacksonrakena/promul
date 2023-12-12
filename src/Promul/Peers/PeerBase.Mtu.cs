@@ -12,8 +12,7 @@ namespace Promul
             // Ignore MTU values below our configured minimum.
             if (packet.Data.Count < NetConstants.PossibleMtu[0])
             {
-                NetDebug.WriteError(
-                    $"[MTU] Peer requested an MTU ({packet.Data.Count}) lower than minimum ({NetConstants.PossibleMtu[0]}.");
+                LogDebug($"[MTU] Peer requested an MTU ({packet.Data.Count}) lower than minimum ({NetConstants.PossibleMtu[0]}.");
                 return;
             }
             // Validate the following:
@@ -32,21 +31,21 @@ namespace Promul
 
             if (frontCheck != packet.Data.Count)
             {
-                NetDebug.WriteError("[MTU] MTU negotiation resulted in a broken packet. " +
+                LogDebug("[MTU] MTU negotiation resulted in a broken packet. " +
                                     $"Peer requested {frontCheck} while packet was only {packet.Data.Count} bytes.");
                 return;
             }
 
             if (frontCheck != backCheck)
             {
-                NetDebug.WriteError(
+                LogDebug(
                     $"[MTU] MTU negotiation resulted in a broken end MTU check. Received {backCheck}, expected to be same as packet size of {packet.Data.Count} bytes.");
                 return;
             }
 
             if (frontCheck > NetConstants.MaxPacketSize)
             {
-                NetDebug.WriteError(
+                LogDebug(
                     $"[MTU] Peer requested an MTU ({frontCheck}) higher than permitted by policy ({NetConstants.MaxPacketSize}).");
                 return;
             }
@@ -79,7 +78,7 @@ namespace Promul
                     if (_currentMtuIndex == NetConstants.PossibleMtu.Length - 1)
                     {
                         _mtuNegotiationComplete = true;
-                        NetDebug.Write($"[MTU] Negotiation complete. MTU for this session: {MaximumTransferUnit}.");
+                        LogDebug($"[MTU] Negotiation complete. MTU for this session: {MaximumTransferUnit}.");
                     }
 
                     break;

@@ -76,7 +76,7 @@ namespace Promul
             }
             catch
             {
-                NetDebug.WriteError("[AC] Invalid incoming data");
+                NetDebug.Write($"{nameof(AcceptIfMatchesKeyAsync)} - {this.RemoteEndPoint} sent invalid incoming data, rejecting");
             }
 
             if (Result == ConnectionRequestResult.Accept)

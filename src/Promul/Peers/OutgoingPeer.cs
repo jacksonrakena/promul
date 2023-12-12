@@ -31,8 +31,7 @@ namespace Promul
             //check connection id
             if (packet.ConnectionTime != ConnectTime)
             {
-                NetDebug.Write(NetLogLevel.Trace,
-                    $"[NC] Invalid connectId: {packet.ConnectionTime} != our({ConnectTime})");
+                LogDebug($"[NC] Invalid connectId: {packet.ConnectionTime} != our({ConnectTime})");
                 return false;
             }
 
@@ -74,7 +73,7 @@ namespace Promul
                 case ConnectionState.Connected:
                     // Old connect request
                     if (connRequest.ConnectionTime == ConnectTime)
-                        NetDebug.Write($"Received connection request while in Connected state from {Id}");
+                        LogDebug($"Received connection request while in Connected state");
                     //just reply accept
                     //await PromulManager.SendRaw(_connectAcceptPacket, EndPoint);
                     // New connect request

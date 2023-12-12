@@ -446,7 +446,7 @@ namespace Promul
                 FastBitConverter.GetBytes(_shutdownPacket.Value.Data.Array, _shutdownPacket.Value.Data.Offset + 1, ConnectTime);
                 if (_shutdownPacket.Value.Data.Count >= MaximumTransferUnit)
                     //Drop additional data
-                    NetDebug.WriteError("[Peer] Disconnect additional data size more than MTU - 8!");
+                    LogDebug("Disconnect additional data size more than MTU - 8!");
                 else if (data != null && data.Count > 0)
                     data.CopyTo(_shutdownPacket.Value.Data.Array, _shutdownPacket.Value.Data.Offset + 9);
                 ConnectionState = ConnectionState.ShutdownRequested;
@@ -492,7 +492,7 @@ namespace Promul
                     fragments[p.FragmentPart] != null ||
                     p.ChannelId != incomingFragments.ChannelId)
                 {
-                    NetDebug.WriteError(
+                    LogDebug(
                         $"Fragmented packet {p.FragmentId} (channel {incomingFragments.ChannelId}): received invalid fragment part {p.FragmentId + 1} (channel {p.ChannelId})");
                     return;
                 }
@@ -526,7 +526,7 @@ namespace Promul
                         if (pos + writtenSize > resultingPacket.Data.Count)
                         {
                             _holdedFragments.Remove(packetFragId);
-                            NetDebug.WriteError(
+                            LogDebug(
                                 $"Fragment error pos: {pos + writtenSize} >= resultPacketSize: {resultingPacket.Data.Count} , totalSize: {incomingFragments.TotalSize}");
                             return;
                         }
@@ -534,7 +534,7 @@ namespace Promul
                         if (fragment.Value.Data.Count > fragment.Value.Data.Count)
                         {
                             _holdedFragments.Remove(packetFragId);
-                            NetDebug.WriteError(
+                            LogDebug(
                                 $"Fragment error size: {fragment.Value.Data.Count} > fragment.RawData.Length: {fragment.Value.Data.Count}");
                             return;
                         }
@@ -581,7 +581,7 @@ namespace Promul
 
             if (packet.ConnectionNumber != _connectNumber)
             {
-                NetDebug.Write(NetLogLevel.Trace,
+                LogDebug(
                     $"Received a packet with invalid connection number ({packet.ConnectionNumber}), expected {_connectNumber}. Ignoring.");
                 return;
             }
@@ -659,7 +659,7 @@ namespace Promul
                     break;
 
                 default:
-                    NetDebug.WriteError("Error! Unexpected packet type: " + packet.Property);
+                    LogDebug("Error! Unexpected packet type: " + packet.Property);
                     break;
             }
         }
