@@ -57,7 +57,6 @@ namespace Promul.Common.Networking
             {
                 case PacketProperty.MtuCheck:
                     _mtuCheckAttempts = 0;
-                    NetDebug.Write($"[MTU] Check OK for MTU value {frontCheck}. Sending back MTU OK: " + frontCheck);
                     packet.Property = PacketProperty.MtuOk;
                     await PromulManager.RawSendAsync(packet, EndPoint);
                     break;
@@ -83,10 +82,6 @@ namespace Promul.Common.Networking
                     {
                         _mtuNegotiationComplete = true;
                         NetDebug.Write($"[MTU] Negotiation complete. MTU for this session: {MaximumTransferUnit}.");
-                    }
-                    else
-                    {
-                        NetDebug.Write("[MTU] MTU confirm acknowledged. Setting MTU to " + MaximumTransferUnit);
                     }
 
                     break;

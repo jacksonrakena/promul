@@ -350,13 +350,13 @@ namespace Promul.Common.Networking
                 var packetDataSize = maxMtuCarryingCapacity - NetConstants.FragmentHeaderSize;
                 var totalPackets = data.Count / packetDataSize + (data.Count % packetDataSize == 0 ? 0 : 1);
 
-                NetDebug.Write($@"Preparing to send {data.Count} bytes of fragmented data.
- Complete data size (header + data): {completePackageSize}
- Current MTU: {mtu}
- Size of header for {property:G}: {headerSize}
- Size of fragmentation header: {NetConstants.FragmentHeaderSize}
- Maximum possible data per packet (MTU-header-fragment header): {packetDataSize}
- That means we must send {totalPackets} total packets.");
+ //                NetDebug.Write($@"Preparing to send {data.Count} bytes of fragmented data.
+ // Complete data size (header + data): {completePackageSize}
+ // Current MTU: {mtu}
+ // Size of header for {property:G}: {headerSize}
+ // Size of fragmentation header: {NetConstants.FragmentHeaderSize}
+ // Maximum possible data per packet (MTU-header-fragment header): {packetDataSize}
+ // That means we must send {totalPackets} total packets.");
 
                 if (totalPackets > ushort.MaxValue)
                     throw new TooBigPacketException("Data was split in " + totalPackets + " fragments, which exceeds " +
@@ -678,7 +678,7 @@ namespace Promul.Common.Networking
             //if (mergedPacketSize + splitThreshold >= MaximumTransferUnit)
             //{
             await PromulManager.RawSendAsync(packet, EndPoint);
-            LogDebug($"[Send] {packet.Property} ({packet.Data.Count} bytes)");
+            LogDebug($"[Send] {packet.Property} ({packet.Data.Count} bytes) (sequence {packet.Sequence})");
             //}
             // if (_mergePos + mergedPacketSize > MaximumTransferUnit) await SendMerged();
             //

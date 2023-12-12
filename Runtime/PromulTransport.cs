@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Threading;
@@ -7,57 +8,48 @@ using System.Threading.Tasks;
 using Promul.Common.Networking;
 using Promul.Common.Networking.Data;
 using Promul.Common.Structs;
+using Unity.Netcode;
+using UnityEngine;
 
 namespace Promul.Runtime
 {
     public class PromulTransport : NetworkTransport
     {
-        private readonly CancellationTokenSource _cts = new CancellationTokenSource();
-
-        private PromulManager _mPromulManager;
-
-        private readonly ConcurrentQueue<(NetworkEvent, ulong, ArraySegment<byte>, float)> _queue =
-            new ConcurrentQueue<(NetworkEvent, ulong, ArraySegment<byte>, float)>();
-
-        private PeerBase? _relayPeer;
-
-        [Tooltip("The address of the relay server.")]
-        public string Address = "127.0.0.1";
-
-        [Tooltip("Maximum duration for a connection to survive without receiving packets, in seconds")]
-        public float DisconnectTimeout = 5f;
-
-        private HostType m_HostType;
-
-        [Tooltip("Maximum connection attempts before client stops and reports a disconnection")]
-        public int MaxConnectAttempts = 10;
-
-        [Tooltip("Size of default buffer for decoding incoming packets, in bytes")]
-        public int MessageBufferSize = 1024 * 5;
-
-        [Tooltip("Interval between ping packets used for detecting latency and checking connection, in seconds")]
-        public float PingInterval = 1f;
+        enum HostType
+        {
+            None,
+            Server,
+            Client
+        }
 
         [Tooltip("The port of the relay server.")]
         public ushort Port = 7777;
+        [Tooltip("The address of the relay server.")]
+        public string Address = "127.0.0.1";
 
+        [Tooltip("Interval between ping packets used for detecting latency and checking connection, in seconds")]
+        public float PingInterval = 1f;
+        [Tooltip("Maximum duration for a connection to survive without receiving packets, in seconds")]
+        public float DisconnectTimeout = 5f;
         [Tooltip("Delay between connection attempts, in seconds")]
         public float ReconnectDelay = 0.5f;
-
-        [Tooltip("Simulated maximum additional latency for packets in milliseconds (0 for no simulation")]
-        public int SimulateMaxLatency;
-
-        [Tooltip("Simulated minimum additional latency for packets in milliseconds (0 for no simulation)")]
-        public int SimulateMinLatency;
-
+        [Tooltip("Maximum connection attempts before client stops and reports a disconnection")]
+        public int MaxConnectAttempts = 10;
+        [Tooltip("Size of default buffer for decoding incoming packets, in bytes")]
+        public int MessageBufferSize = 1024 * 5;
         [Tooltip("Simulated chance for a packet to be \"lost\", from 0 (no simulation) to 100 percent")]
-        public int SimulatePacketLossChance;
+        public int SimulatePacketLossChance = 0;
+        [Tooltip("Simulated minimum additional latency for packets in milliseconds (0 for no simulation)")]
+        public int SimulateMinLatency = 0;
+        [Tooltip("Simulated maximum additional latency for packets in milliseconds (0 for no simulation")]
+        public int SimulateMaxLatency = 0;
+
+        PromulManager _mPromulManager;
 
         public override ulong ServerClientId => 0;
+        HostType m_HostType;
 
-        public override bool IsSupported => Application.platform != RuntimePlatform.WebGLPlayer;
-
-        private void OnValidate()
+        void OnValidate()
         {
             PingInterval = Math.Max(0, PingInterval);
             DisconnectTimeout = Math.Max(0, DisconnectTimeout);
@@ -69,13 +61,20 @@ namespace Promul.Runtime
             SimulateMaxLatency = Math.Max(SimulateMinLatency, SimulateMaxLatency);
         }
 
+        ConcurrentQueue<(NetworkEvent, ulong, ArraySegment<byte>)> _queue = new ConcurrentQueue<(NetworkEvent, ulong, ArraySegment<byte>)>();
+        
+        public override bool IsSupported => Application.platform != RuntimePlatform.WebGLPlayer;
+
+        PeerBase? _relayPeer;
+        CancellationTokenSource _cts = new CancellationTokenSource();
+
         public async Task SendControl(RelayControlMessage rcm, NetworkDelivery qos)
         {
             var writer = CompositeWriter.Create();
             writer.Write(rcm);
             if (_relayPeer != null) await _relayPeer.SendAsync(writer, ConvertNetworkDelivery(qos));
         }
-
+        
         public override void Send(ulong clientId, ArraySegment<byte> data, NetworkDelivery qos)
         {
             Debug.Log("Sending to " + clientId + ": " + string.Join(" ", data.Select(e => e.ToString("X2"))));
@@ -90,8 +89,7 @@ namespace Promul.Runtime
             });
         }
 
-        private async Task OnNetworkReceive(PeerBase peer, CompositeReader reader, byte channel,
-            DeliveryMethod deliveryMethod)
+        async ValueTask OnNetworkReceive(PeerBase peer, CompositeReader reader, byte channel, DeliveryMethod deliveryMethod)
         {
             var message = reader.ReadRelayControlMessage();
             var author = message.AuthorClientId;
@@ -101,24 +99,24 @@ namespace Promul.Runtime
                 // Either we are host and a client has connected,
                 // or we're a client and we're connected.
                 case RelayControlMessageType.Connected:
-                {
-                    _queue.Enqueue((NetworkEvent.Connect, author, default, 0));
-                    break;
-                }
+                    {
+                        _queue.Enqueue((NetworkEvent.Connect, author, default));
+                        break;
+                    }
                 // A client has disconnected from the relay.
                 case RelayControlMessageType.Disconnected:
-                {
-                    _queue.Enqueue((NetworkEvent.Disconnect, author, default, 0));
-                    break;
-                }
+                    {
+                        _queue.Enqueue((NetworkEvent.Disconnect, author, default));
+                        break;
+                    }
                 // Relayed data
                 case RelayControlMessageType.Data:
                 {
                     Debug.Log("Data: " + string.Join(" ", message.Data.Select(e => e.ToString("X2"))));
                     var data = new byte[message.Data.Count];
                     message.Data.CopyTo(data);
-                    _queue.Enqueue((NetworkEvent.Data, author, data, 0));
-                    break;
+                    _queue.Enqueue((NetworkEvent.Data, author, data));
+                        break;
                 }
                 case RelayControlMessageType.KickFromRelay:
                     break;
@@ -128,8 +126,7 @@ namespace Promul.Runtime
             }
         }
 
-        public override NetworkEvent PollEvent(out ulong clientId, out ArraySegment<byte> payload,
-            out float receiveTime)
+        public override NetworkEvent PollEvent(out ulong clientId, out ArraySegment<byte> payload, out float receiveTime)
         {
             clientId = 0;
             receiveTime = Time.realtimeSinceStartup;
@@ -141,11 +138,10 @@ namespace Promul.Runtime
                 payload = i.Item3;
                 return i.Item1;
             }
-
             return NetworkEvent.Nothing;
         }
 
-        private bool ConnectToRelayServer(string joinCode)
+        bool ConnectToRelayServer(string joinCode)
         {
             _ = Task.Run(async () =>
             {
@@ -172,11 +168,7 @@ namespace Promul.Runtime
 
         public override void DisconnectRemoteClient(ulong clientId)
         {
-            SendControl(
-                new RelayControlMessage
-                {
-                    Type = RelayControlMessageType.KickFromRelay, AuthorClientId = clientId, Data = Array.Empty<byte>()
-                }, NetworkDelivery.Reliable);
+            SendControl(new RelayControlMessage {Type = RelayControlMessageType.KickFromRelay, AuthorClientId = clientId, Data = Array.Empty<byte>() }, NetworkDelivery.Reliable);
         }
 
         public override void DisconnectLocalClient()
@@ -198,7 +190,7 @@ namespace Promul.Runtime
             _mPromulManager.OnPeerDisconnected -= OnPeerDisconnected;
             _mPromulManager.OnReceive -= OnNetworkReceive;
             _ = _mPromulManager.StopAsync();
-
+            
             _cts.Cancel();
             _relayPeer = null;
             m_HostType = HostType.None;
@@ -225,7 +217,7 @@ namespace Promul.Runtime
             _mPromulManager.OnReceive += OnNetworkReceive;
         }
 
-        private static DeliveryMethod ConvertNetworkDelivery(NetworkDelivery type)
+        static DeliveryMethod ConvertNetworkDelivery(NetworkDelivery type)
         {
             return type switch
             {
@@ -237,29 +229,20 @@ namespace Promul.Runtime
                 _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
             };
         }
-
-        private async Task OnConnectionRequest(ConnectionRequest request)
+        async ValueTask OnConnectionRequest(ConnectionRequest request)
         {
             await request.RejectAsync(force: true);
         }
-
-        private async Task OnPeerDisconnected(PeerBase peer, DisconnectInfo disconnectInfo)
+        async ValueTask OnPeerDisconnected(PeerBase peer, DisconnectInfo disconnectInfo)
         {
-            Debug.Log("Disconnected " + disconnectInfo.Reason + " " + disconnectInfo.SocketErrorCode);
-            if (disconnectInfo.Reason != DisconnectReason.DisconnectPeerCalled)
-                _queue.Enqueue((NetworkEvent.TransportFailure, 0, new ArraySegment<byte>(), 0));
+            Debug.Log("Disconnected " + disconnectInfo.Reason.ToString() + " " + disconnectInfo.SocketErrorCode.ToString());
+            if (disconnectInfo.Reason != DisconnectReason.DisconnectPeerCalled) 
+                _queue.Enqueue((NetworkEvent.TransportFailure, 0, new ArraySegment<byte>()));
         }
 
-        private static int SecondsToMilliseconds(float seconds)
+        static int SecondsToMilliseconds(float seconds)
         {
             return (int)Mathf.Ceil(seconds * 1000);
-        }
-
-        private enum HostType
-        {
-            None,
-            Server,
-            Client
         }
     }
 }
