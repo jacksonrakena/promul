@@ -14,7 +14,7 @@ namespace Promul
 
         private NetworkPacket _outgoingAcks; //for send acks
         private readonly SemaphoreSlim _outgoingAcksSem = new(1, 1);
-        private readonly PendingReliablePacket[] _pendingPackets; //for unacked packets and duplicates
+        private readonly PendingReliablePacket?[] _pendingPackets; //for unacked packets and duplicates
 
         private readonly SemaphoreSlim _pendingPacketsSem = new(1, 1);
 
@@ -33,9 +33,7 @@ namespace Promul
             _id = id;
             _windowSize = NetConstants.DefaultWindowSize;
             _ordered = ordered;
-            _pendingPackets = new PendingReliablePacket[_windowSize];
-            for (var i = 0; i < _pendingPackets.Length; i++)
-                _pendingPackets[i] = new PendingReliablePacket();
+            _pendingPackets = new PendingReliablePacket?[_windowSize];
 
             if (_ordered)
             {
@@ -112,11 +110,10 @@ namespace Promul
 
                     //clear packet
                     var p = _pendingPackets[pendingIdx];
-                    var r = await p.ClearAsync(Peer);
-                    _pendingPackets[pendingIdx] = p;
-                    if (r)
+                    if (p != null)
                     {
-                        //Peer.LogDebug($"[Packet {packet.Sequence}] Correct ack for {pendingSeq}");
+                        await p.ClearAsync(Peer);
+                        _pendingPackets[pendingIdx] = null;
                     }
                 }
             }
@@ -160,10 +157,7 @@ namespace Promul
                         var netPacket = OutgoingQueue.Dequeue();
                         netPacket.Sequence = (ushort)_localSequence;
                         netPacket.ChannelId = _id;
-                        var prp = new PendingReliablePacket
-                        {
-                            _packet = netPacket
-                        };
+                        var prp = new PendingReliablePacket(netPacket);
                         _pendingPackets[_localSequence % _windowSize] = prp;
                         //_pendingPackets[_localSequence % _windowSize] = new PendingReliablePacket(); .Init(netPacket);
                         _localSequence = (_localSequence + 1) % NetConstants.MaxSequence;
@@ -180,10 +174,10 @@ namespace Promul
                      pendingSeq = (pendingSeq + 1) % NetConstants.MaxSequence)
                 {
                     var p = _pendingPackets[pendingSeq % _windowSize];
-                    var sendSeq = await p.TrySendAsync(currentTime, Peer);
-                    _pendingPackets[pendingSeq % _windowSize] = p;
-                    if (sendSeq)
+                    if (p != null)
                     {
+                        await p.TrySendAsync(currentTime, Peer);
+                        _pendingPackets[pendingSeq % _windowSize] = p;
                         hasPendingPackets = true;
                     }
                 }
@@ -336,52 +330,39 @@ namespace Promul
         private class PendingReliablePacket
         {
             private bool _isSent;
-            public NetworkPacket? _packet;
-            private long _timeStamp;
+            private readonly NetworkPacket _packet;
+            private long? _timeStamp;
 
             public override string ToString()
             {
-                return _packet == null ? "Empty" : _packet.Value.Sequence.ToString();
+                return _packet.Sequence.ToString();
             }
 
-            public void Init(NetworkPacket packet)
+            public PendingReliablePacket(NetworkPacket packet)
             {
-                _packet = packet;
+                this._packet = packet;
                 _isSent = false;
+                _timeStamp = null;
             }
 
-            //Returns true if there is a pending packet inside
-            public async Task<bool> TrySendAsync(long utcNowTicks, PeerBase peer)
+            public async Task TrySendAsync(long utcNowTicks, PeerBase peer)
             {
-                if (_packet == null)
-                {
-                    return false;
-                }
-
                 if (_isSent) //check send time
                 {
                     var resendDelay = peer.ResendDelay * TimeSpan.TicksPerMillisecond;
-                    double packetHoldTime = utcNowTicks - _timeStamp;
-                    if (packetHoldTime < resendDelay) return true;
+                    double packetHoldTime = utcNowTicks - _timeStamp!.Value;
+                    if (packetHoldTime < resendDelay) return;
                     NetDebug.Write($"[RC]Resend: {packetHoldTime} > {resendDelay}");
                 }
 
                 _timeStamp = utcNowTicks;
                 _isSent = true;
-                await peer.SendUserData(_packet.Value);
-                return true;
+                await peer.SendUserData(_packet);
             }
 
-            public async Task<bool> ClearAsync(PeerBase peer)
+            public async Task ClearAsync(PeerBase peer)
             {
-                if (_packet != null)
-                {
-                    await peer.RecycleAndDeliver(_packet.Value);
-                    _packet = null;
-                    return true;
-                }
-
-                return false;
+                await peer.RecycleAndDeliver(_packet);
             }
         }
     }
