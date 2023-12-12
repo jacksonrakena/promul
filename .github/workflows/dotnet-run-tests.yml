@@ -18,8 +18,10 @@ jobs:
       with:
         dotnet-version: 7.0.x
     - name: Restore dependencies
-      run: dotnet restore Tests~/Promul.Tests.csproj
+      run: dotnet restore test~/Promul.Tests/Promul.Tests.csproj && dotnet restore test~/Promul.Server.Tests/Promul.Server.Tests.csproj
     - name: Build
-      run: dotnet build Tests~/Promul.Tests.csproj --no-restore
-    - name: Test
-      run: dotnet test Tests~/Promul.Tests.csproj --no-build --verbosity normal
+      run: dotnet build test~/Promul.Tests/Promul.Tests.csproj --no-restore && dotnet build test~/Promul.Server.Tests/Promul.Server.Tests.csproj --no-restore
+    - name: Test core
+      run: dotnet test test~/Promul.Tests/Promul.Tests.csproj--no-build --verbosity normal
+    - name: Test server
+      run: dotnet test test~/Promul.Server.Tests/Promul.Server.Tests.csproj--no-build --verbosity normal
