@@ -7,7 +7,7 @@ namespace Promul.Common.Networking.Channels
 {
     internal sealed class SequencedChannel : ChannelBase
     {
-        private readonly NetworkPacket? _ackPacket;
+        private NetworkPacket? _ackPacket;
         private readonly byte _id;
 
         private readonly SemaphoreSlim _outgoingQueueSem = new(1, 1);
@@ -24,8 +24,9 @@ namespace Promul.Common.Networking.Channels
             _reliable = reliable;
             if (_reliable)
             {
-                _ackPacket = NetworkPacket.FromProperty(PacketProperty.Ack, 0);
-                _ackPacket.ChannelId = id;
+                var ap = NetworkPacket.FromProperty(PacketProperty.Ack, 0);
+                ap.ChannelId = id;
+                _ackPacket = ap;
             }
         }
 
@@ -41,7 +42,7 @@ namespace Promul.Common.Networking.Channels
                     if (packet != null)
                     {
                         _lastPacketSendTime = currentTime;
-                        await Peer.SendUserData(packet);
+                        await Peer.SendUserData(packet.Value);
                     }
                 }
             }
@@ -71,20 +72,22 @@ namespace Promul.Common.Networking.Channels
             if (_reliable && _mustSendAck)
             {
                 _mustSendAck = false;
-                _ackPacket!.Sequence = _remoteSequence;
-                await Peer.SendUserData(_ackPacket);
+                var p = _ackPacket.Value;
+                p.Sequence = _remoteSequence;
+                _ackPacket = p;
+                await Peer.SendUserData(_ackPacket.Value);
             }
 
             return _lastPacket != null;
         }
 
-        public override async Task<bool> HandlePacketAsync(NetworkPacket packet)
+        public override async ValueTask<bool> HandlePacketAsync(NetworkPacket packet)
         {
             if (packet.IsFragmented)
                 return false;
             if (packet.Property == PacketProperty.Ack)
             {
-                if (_reliable && _lastPacket != null && packet.Sequence == _lastPacket.Sequence)
+                if (_reliable && _lastPacket != null && packet.Sequence == _lastPacket.Value.Sequence)
                     _lastPacket = null;
                 return false;
             }

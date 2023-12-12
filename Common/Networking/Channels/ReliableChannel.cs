@@ -14,14 +14,14 @@ namespace Promul.Common.Networking.Channels
         private readonly byte _id;
         private readonly bool _ordered;
 
-        private readonly NetworkPacket _outgoingAcks; //for send acks
+        private NetworkPacket _outgoingAcks; //for send acks
         private readonly SemaphoreSlim _outgoingAcksSem = new(1, 1);
         private readonly PendingReliablePacket[] _pendingPackets; //for unacked packets and duplicates
 
         private readonly SemaphoreSlim _pendingPacketsSem = new(1, 1);
 
         private readonly SemaphoreSlim _pendingPacketsSemaphore = new(1, 1);
-        private readonly NetworkPacket[]? _receivedPackets; //for order
+        private readonly NetworkPacket?[]? _receivedPackets; //for order
         private readonly int _windowSize;
 
         private int _localSequence;
@@ -43,7 +43,7 @@ namespace Promul.Common.Networking.Channels
             if (_ordered)
             {
                 _deliveryMethod = DeliveryMethod.ReliableOrdered;
-                _receivedPackets = new NetworkPacket[_windowSize];
+                _receivedPackets = new NetworkPacket?[_windowSize];
                 _earlyReceived = Array.Empty<bool>();
             }
             else
@@ -60,7 +60,7 @@ namespace Promul.Common.Networking.Channels
             _outgoingAcks.ChannelId = id;
         }
 
-        private async Task ProcessAckAsync(NetworkPacket packet)
+        private async ValueTask ProcessAckAsync(NetworkPacket packet)
         {
             if (packet.Data.Count != _outgoingAcks.Data.Count)
             {
@@ -188,7 +188,7 @@ namespace Promul.Common.Networking.Channels
 
 
         //Process incoming packet
-        public override async Task<bool> HandlePacketAsync(NetworkPacket packet)
+        public override async ValueTask<bool> HandlePacketAsync(NetworkPacket packet)
         {
             if (packet.Property == PacketProperty.Ack)
             {
@@ -238,7 +238,9 @@ namespace Promul.Common.Networking.Channels
                 {
                     //New window position
                     var newWindowStart = (_remoteWindowStart + relate - _windowSize + 1) % NetConstants.MaxSequence;
-                    _outgoingAcks.Sequence = (ushort)newWindowStart;
+                    var oa = _outgoingAcks;
+                    oa.Sequence = (ushort)newWindowStart;
+                    _outgoingAcks = oa;
 
                     //Clean old data
                     while (_remoteWindowStart != newWindowStart)
@@ -285,12 +287,12 @@ namespace Promul.Common.Networking.Channels
 
                 if (_ordered)
                 {
-                    NetworkPacket p;
+                    NetworkPacket? p;
                     while ((p = _receivedPackets[_remoteSequence % _windowSize]) != null)
                     {
                         //process holden packet
                         _receivedPackets[_remoteSequence % _windowSize] = null;
-                        await Peer.AddReliablePacket(_deliveryMethod, p);
+                        await Peer.AddReliablePacket(_deliveryMethod, p.Value);
                         _remoteSequence = (_remoteSequence + 1) % NetConstants.MaxSequence;
                     }
                 }
@@ -329,7 +331,7 @@ namespace Promul.Common.Networking.Channels
 
             public override string ToString()
             {
-                return _packet == null ? "Empty" : _packet.Sequence.ToString();
+                return _packet == null ? "Empty" : _packet.Value.Sequence.ToString();
             }
 
             public void Init(NetworkPacket packet)
@@ -354,7 +356,7 @@ namespace Promul.Common.Networking.Channels
 
                 _timeStamp = utcNowTicks;
                 _isSent = true;
-                await peer.SendUserData(_packet);
+                await peer.SendUserData(_packet.Value);
                 return true;
             }
 
@@ -362,7 +364,7 @@ namespace Promul.Common.Networking.Channels
             {
                 if (_packet != null)
                 {
-                    await peer.RecycleAndDeliver(_packet);
+                    await peer.RecycleAndDeliver(_packet.Value);
                     _packet = null;
                     return true;
                 }

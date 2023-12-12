@@ -11,11 +11,11 @@ namespace Promul.Common.Networking
     {
         private readonly NetworkPacket _connectRequestPacket;
 
-        public OutgoingPeer(PromulManager manager, IPEndPoint remote, int id, long connectTime, byte connectionNumber,
+        public OutgoingPeer(PromulManager manager, IPEndPoint remote, int id, byte connectionNumber,
             ArraySegment<byte> data)
-            : base(manager, remote, id, connectTime, connectionNumber)
+            : base(manager, remote, id, DateTime.UtcNow.Ticks, connectionNumber)
         {
-            var packet = NetConnectRequestPacket.Make(data, remote.Serialize(), connectTime, id);
+            var packet = NetConnectRequestPacket.Make(data, remote.Serialize(), ConnectTime, id);
             packet.ConnectionNumber = connectionNumber;
             ConnectionState = ConnectionState.Outgoing;
             _connectRequestPacket = packet;

@@ -79,7 +79,7 @@ namespace Promul.Common.Networking
             return false;
         }
 
-        private async Task ReceiveInternalAsync(Socket s, EndPoint bufferEndPoint, CancellationToken ct = default)
+        private async ValueTask ReceiveInternalAsync(Socket s, EndPoint bufferEndPoint, CancellationToken ct = default)
         {
             var receiveBuffer = new byte[NetConstants.MaxPacketSize];
             var receive = await s.ReceiveFromAsync(receiveBuffer, SocketFlags.None, bufferEndPoint);
@@ -106,8 +106,8 @@ namespace Promul.Common.Networking
                         await ReceiveInternalAsync(_udpSocketv4, bufferEndPoint4, cancellationToken);
                     else
                         await Task.WhenAll(
-                            ReceiveInternalAsync(_udpSocketv4, bufferEndPoint4, cancellationToken),
-                            ReceiveInternalAsync(_udpSocketv6, bufferEndPoint6, cancellationToken)
+                            ReceiveInternalAsync(_udpSocketv4, bufferEndPoint4, cancellationToken).AsTask(),
+                            ReceiveInternalAsync(_udpSocketv6, bufferEndPoint6, cancellationToken).AsTask()
                         );
                 }
                 catch (SocketException ex)
@@ -294,7 +294,7 @@ namespace Promul.Common.Networking
         /// <param name="remoteEndPoint">The remote endpoint to send to.</param>
         /// <param name="ct">The cancellation token used to cancel the send operation.</param>
         /// <returns>The number of bytes sent.</returns>
-        internal async Task<int> RawSendAsync(ArraySegment<byte> data, IPEndPoint remoteEndPoint,
+        internal async ValueTask<int> RawSendAsync(ArraySegment<byte> data, IPEndPoint remoteEndPoint,
             CancellationToken ct = default)
         {
             var socket = _udpSocketv4;
@@ -359,7 +359,7 @@ namespace Promul.Common.Networking
             return result;
         }
 
-        public async Task<bool> SendBroadcast(ArraySegment<byte> data, int port)
+        public async ValueTask<bool> SendBroadcast(ArraySegment<byte> data, int port)
         {
             NetworkPacket packet;
             if (_extraPacketLayer != null)

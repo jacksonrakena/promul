@@ -58,6 +58,6 @@ namespace Promul.Common.Networking.Channels
         /// </summary>
         /// <param name="packet"></param>
         /// <returns></returns>
-        public abstract Task<bool> HandlePacketAsync(NetworkPacket packet);
+        public abstract ValueTask<bool> HandlePacketAsync(NetworkPacket packet);
     }
 }

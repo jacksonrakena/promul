@@ -30,12 +30,12 @@ namespace Promul.Common.Networking
         private readonly Dictionary<ushort, IncomingFragments> _holdedFragments;
 
         // Merging
-        private readonly NetworkPacket _mergeData;
+        private NetworkPacket _mergeData;
         private readonly SemaphoreSlim _mtuMutex = new(1, 1);
 
-        private readonly NetworkPacket _pingPacket = NetworkPacket.FromProperty(PacketProperty.Pong, 0);
+        private NetworkPacket _pingPacket = NetworkPacket.FromProperty(PacketProperty.Pong, 0);
         private readonly Stopwatch _pingTimer = new();
-        private readonly NetworkPacket _pongPacket = NetworkPacket.FromProperty(PacketProperty.Ping, 0);
+        private NetworkPacket _pongPacket = NetworkPacket.FromProperty(PacketProperty.Ping, 0);
 
         private readonly SemaphoreSlim _shutdownSemaphore // Locks for shutdown operations
             = new(1, 1);
@@ -258,10 +258,7 @@ namespace Promul.Common.Networking
         internal static async Task<OutgoingPeer> ConnectToAsync(PromulManager manager, IPEndPoint remote, int id,
             byte connectionNumber, ArraySegment<byte> data)
         {
-            var time = DateTime.UtcNow.Ticks;
-            var packet = NetConnectRequestPacket.Make(data, remote.Serialize(), time, id);
-            packet.ConnectionNumber = connectionNumber;
-            var peer = new OutgoingPeer(manager, remote, id, time, connectionNumber, data);
+            var peer = new OutgoingPeer(manager, remote, id, connectionNumber, data);
 
             await peer.SendConnectionRequestAsync();
             return peer;
@@ -448,16 +445,17 @@ namespace Promul.Common.Networking
 
                 Interlocked.Exchange(ref _timeSinceLastPacket, 0);
 
-                _shutdownPacket = NetworkPacket.FromProperty(PacketProperty.Disconnect, data.Count);
-                _shutdownPacket.ConnectionNumber = _connectNumber;
-                FastBitConverter.GetBytes(_shutdownPacket.Data.Array, _shutdownPacket.Data.Offset + 1, ConnectTime);
-                if (_shutdownPacket.Data.Count >= MaximumTransferUnit)
+                var sp = NetworkPacket.FromProperty(PacketProperty.Disconnect, data.Count);
+                sp.ConnectionNumber = _connectNumber;
+                _shutdownPacket = sp;
+                FastBitConverter.GetBytes(_shutdownPacket.Value.Data.Array, _shutdownPacket.Value.Data.Offset + 1, ConnectTime);
+                if (_shutdownPacket.Value.Data.Count >= MaximumTransferUnit)
                     //Drop additional data
                     NetDebug.WriteError("[Peer] Disconnect additional data size more than MTU - 8!");
                 else if (data != null && data.Count > 0)
-                    data.CopyTo(_shutdownPacket.Data.Array, _shutdownPacket.Data.Offset + 9);
+                    data.CopyTo(_shutdownPacket.Value.Data.Array, _shutdownPacket.Value.Data.Offset + 9);
                 ConnectionState = ConnectionState.ShutdownRequested;
-                await PromulManager.RawSendAsync(_shutdownPacket, EndPoint);
+                await PromulManager.RawSendAsync(_shutdownPacket.Value, EndPoint);
                 return result;
             }
             finally
@@ -474,7 +472,7 @@ namespace Promul.Common.Networking
             ResendDelay = 25.0 + RoundTripTime * 2.1; // 25 ms + double rtt
         }
 
-        internal async Task AddReliablePacket(DeliveryMethod method, NetworkPacket p)
+        internal async ValueTask AddReliablePacket(DeliveryMethod method, NetworkPacket p)
         {
             if (p.IsFragmented)
             {
@@ -485,7 +483,7 @@ namespace Promul.Common.Networking
                 {
                     incomingFragments = new IncomingFragments
                     {
-                        Fragments = new NetworkPacket[p.FragmentsTotal],
+                        Fragments = new NetworkPacket?[p.FragmentsTotal],
                         ChannelId = p.ChannelId
                     };
                     _holdedFragments.Add(packetFragId, incomingFragments);
@@ -526,34 +524,37 @@ namespace Promul.Common.Networking
                 for (var i = 0; i < incomingFragments.ReceivedCount; i++)
                 {
                     var fragment = fragments[i];
-                    var writtenSize = fragment.Data.Count - NetConstants.FragmentedHeaderTotalSize;
-
-                    if (pos + writtenSize > resultingPacket.Data.Count)
+                    if (fragment.HasValue)
                     {
-                        _holdedFragments.Remove(packetFragId);
-                        NetDebug.WriteError(
-                            $"Fragment error pos: {pos + writtenSize} >= resultPacketSize: {resultingPacket.Data.Count} , totalSize: {incomingFragments.TotalSize}");
-                        return;
+                        var writtenSize = fragment.Value.Data.Count - NetConstants.FragmentedHeaderTotalSize;
+
+                        if (pos + writtenSize > resultingPacket.Data.Count)
+                        {
+                            _holdedFragments.Remove(packetFragId);
+                            NetDebug.WriteError(
+                                $"Fragment error pos: {pos + writtenSize} >= resultPacketSize: {resultingPacket.Data.Count} , totalSize: {incomingFragments.TotalSize}");
+                            return;
+                        }
+
+                        if (fragment.Value.Data.Count > fragment.Value.Data.Count)
+                        {
+                            _holdedFragments.Remove(packetFragId);
+                            NetDebug.WriteError(
+                                $"Fragment error size: {fragment.Value.Data.Count} > fragment.RawData.Length: {fragment.Value.Data.Count}");
+                            return;
+                        }
+
+                        //Create resulting big packet
+                        Buffer.BlockCopy(
+                            fragment.Value.Data.Array,
+                            fragment.Value.Data.Offset + NetConstants.FragmentedHeaderTotalSize,
+                            resultingPacket.Data.Array,
+                            resultingPacket.Data.Offset + pos,
+                            writtenSize);
+                        pos += writtenSize;
+
+                        fragments[i] = null;   
                     }
-
-                    if (fragment.Data.Count > fragment.Data.Count)
-                    {
-                        _holdedFragments.Remove(packetFragId);
-                        NetDebug.WriteError(
-                            $"Fragment error size: {fragment.Data.Count} > fragment.RawData.Length: {fragment.Data.Count}");
-                        return;
-                    }
-
-                    //Create resulting big packet
-                    Buffer.BlockCopy(
-                        fragment.Data.Array,
-                        fragment.Data.Offset + NetConstants.FragmentedHeaderTotalSize,
-                        resultingPacket.Data.Array,
-                        resultingPacket.Data.Offset + pos,
-                        writtenSize);
-                    pos += writtenSize;
-
-                    fragments[i] = null;
                 }
 
                 //Clear memory
@@ -573,7 +574,7 @@ namespace Promul.Common.Networking
         }
 
         //Process incoming packet
-        internal async Task ProcessPacket(NetworkPacket packet)
+        internal async ValueTask ProcessPacket(NetworkPacket packet)
         {
             if (ConnectionState == ConnectionState.Outgoing || ConnectionState == ConnectionState.Disconnected) return;
             if (packet.Property == PacketProperty.ShutdownOk)
@@ -746,7 +747,7 @@ namespace Promul.Common.Networking
                         if (_shutdownTimer >= ShutdownDelay)
                         {
                             _shutdownTimer = 0;
-                            await PromulManager.RawSendAsync(_shutdownPacket, EndPoint);
+                            await PromulManager.RawSendAsync(_shutdownPacket.Value, EndPoint);
                         }
                     }
 
@@ -861,7 +862,7 @@ namespace Promul.Common.Networking
         // Fragments
         private struct IncomingFragments
         {
-            public NetworkPacket[] Fragments;
+            public NetworkPacket?[] Fragments;
             public int ReceivedCount;
             public int TotalSize;
             public byte ChannelId;

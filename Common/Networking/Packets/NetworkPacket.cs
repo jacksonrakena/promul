@@ -25,7 +25,7 @@ namespace Promul.Common.Networking.Packets
         InvalidProtocol
     }
 
-    public class NetworkPacket
+    public readonly struct NetworkPacket
     {
         private static readonly int PropertiesCount = Enum.GetValues(typeof(PacketProperty)).Length;
         private static readonly int[] HeaderSizes;

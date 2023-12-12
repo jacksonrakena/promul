@@ -426,10 +426,10 @@ namespace Promul.Common.Networking
             if (OnConnectionRequest != null) await OnConnectionRequest(req);
         }
 
-        internal async Task CreateReceiveEvent(NetworkPacket packet, DeliveryMethod method, byte channelNumber,
+        internal ValueTask CreateReceiveEvent(NetworkPacket packet, DeliveryMethod method, byte channelNumber,
             int headerSize, PeerBase fromPeer)
         {
-            if (OnReceive != null) await OnReceive(fromPeer, packet.CreateReader(headerSize), channelNumber, method);
+            return OnReceive?.Invoke(fromPeer, packet.CreateReader(headerSize), channelNumber, method) ?? default;
         }
 
         /// <summary>
@@ -655,7 +655,7 @@ namespace Promul.Common.Networking
         private const int MinLatencyThreshold = 5;
 #endif
 
-        private async Task OnMessageReceived(NetworkPacket packet, IPEndPoint remoteEndPoint)
+        private async ValueTask OnMessageReceived(NetworkPacket packet, IPEndPoint remoteEndPoint)
         {
 #if DEBUG
             if (SimulatePacketLoss && _randomGenerator.NextDouble() * 100 < SimulatePacketLossChance)
@@ -680,7 +680,7 @@ namespace Promul.Common.Networking
             await DebugMessageReceived(packet, remoteEndPoint);
         }
 
-        private async Task DebugMessageReceived(NetworkPacket packet, IPEndPoint remoteEndPoint)
+        private async ValueTask DebugMessageReceived(NetworkPacket packet, IPEndPoint remoteEndPoint)
         {
 #endif
             var originalPacketSize = packet.Data.Count;
@@ -731,7 +731,6 @@ namespace Promul.Common.Networking
             if (!packet.Verify())
             {
                 NetDebug.WriteError("[NM] DataReceived: bad!");
-                //PoolRecycle(packet);
                 return;
             }
 

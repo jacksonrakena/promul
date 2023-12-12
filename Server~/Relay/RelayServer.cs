@@ -52,7 +52,7 @@ public class RelayServer
         _sessionsByCode.Remove(session.JoinCode);
     }
 
-    public async Task OnNetworkReceive(PeerBase peer, CompositeReader reader, byte channelNumber,
+    public async ValueTask OnNetworkReceive(PeerBase peer, CompositeReader reader, byte channelNumber,
         DeliveryMethod deliveryMethod)
     {
         var packet = reader.ReadRelayControlMessage();
@@ -68,7 +68,7 @@ public class RelayServer
         await session.OnReceive(peer, packet, deliveryMethod);
     }
 
-    public async Task OnConnectionRequest(ConnectionRequest request)
+    public async ValueTask OnConnectionRequest(ConnectionRequest request)
     {
         var joinCode = request.Data.ReadString();
 
@@ -86,12 +86,12 @@ public class RelayServer
         _sessionsByPeer[peer.Id] = keyedSession;
     }
 
-    public async Task OnPeerConnected(PeerBase peer)
+    public async ValueTask OnPeerConnected(PeerBase peer)
     {
         _logger.LogInformation($"Connected to {peer.EndPoint}");
     }
 
-    public async Task OnPeerDisconnected(PeerBase peer, DisconnectInfo disconnectInfo)
+    public async ValueTask OnPeerDisconnected(PeerBase peer, DisconnectInfo disconnectInfo)
     {
         _logger.LogInformation(
             $"Peer {peer.Id} disconnected: {disconnectInfo.Reason} {disconnectInfo.SocketErrorCode}");

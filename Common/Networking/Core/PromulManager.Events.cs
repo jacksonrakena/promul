@@ -7,27 +7,27 @@ namespace Promul.Common.Networking
 {
     public partial class PromulManager
     {
-        public delegate Task ConnectionlessReceiveEvent(IPEndPoint remoteEndPoint, CompositeReader reader,
+        public delegate ValueTask ConnectionlessReceiveEvent(IPEndPoint remoteEndPoint, CompositeReader reader,
             UnconnectedMessageType messageType);
 
-        public delegate Task ConnectionRequestEvent(ConnectionRequest request);
+        public delegate ValueTask ConnectionRequestEvent(ConnectionRequest request);
 
-        public delegate Task DeliveryEvent(PeerBase peer, object? userData);
+        public delegate ValueTask DeliveryEvent(PeerBase peer, object? userData);
 
-        public delegate Task NetworkErrorEvent(IPEndPoint endPoint, SocketError socketError);
+        public delegate ValueTask NetworkErrorEvent(IPEndPoint endPoint, SocketError socketError);
 
-        public delegate Task NetworkLatencyUpdateEvent(PeerBase peer, int latency);
+        public delegate ValueTask NetworkLatencyUpdateEvent(PeerBase peer, int latency);
 
-        public delegate Task NetworkReceiveEvent(PeerBase peer, CompositeReader reader, byte channel,
+        public delegate ValueTask NetworkReceiveEvent(PeerBase peer, CompositeReader reader, byte channel,
             DeliveryMethod deliveryMethod);
 
-        public delegate Task NtpResponseEvent(NtpPacket packet);
+        public delegate ValueTask NtpResponseEvent(NtpPacket packet);
 
-        public delegate Task PeerAddressChangedEvent(PeerBase peer, IPEndPoint previousAddress);
+        public delegate ValueTask PeerAddressChangedEvent(PeerBase peer, IPEndPoint previousAddress);
 
-        public delegate Task PeerConnectedEvent(PeerBase peer);
+        public delegate ValueTask PeerConnectedEvent(PeerBase peer);
 
-        public delegate Task PeerDisconnectedEvent(PeerBase peer, DisconnectInfo disconnectInfo);
+        public delegate ValueTask PeerDisconnectedEvent(PeerBase peer, DisconnectInfo disconnectInfo);
 
         /// <summary>
         ///     Invoked when a connection is made with a remote peer.
