@@ -1,8 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <RootNamespace>Promul.Runtime</RootNamespace>
-        <AssemblyName>Promul.Runtime</AssemblyName>
         <TargetFramework>netstandard2.1</TargetFramework>
         <FileAlignment>512</FileAlignment>
         <LangVersion>8</LangVersion>
@@ -10,6 +8,7 @@
         <BaseOutputPath>bin~</BaseOutputPath>
         <BaseIntermediateOutputPath>obj~</BaseIntermediateOutputPath>
         <DefineConstants>DEBUG</DefineConstants>
+        <PackageId>Promul.Runtime.Unity</PackageId>
     </PropertyGroup>
     <ItemGroup>
         <Reference Include="UnityEngine.CoreModule">
@@ -21,7 +20,7 @@
     </ItemGroup>
     <ItemGroup>
         <Content Include="com.fireworkeyes.netcode.transport.promul.asmdef"/>
-        <ProjectReference Include="..\Common\Promul.Common.csproj">
+        <ProjectReference Include="..\Promul.Common\Promul.Common.csproj">
             <Project>{009a3a68-30a0-44eb-9b42-8fcb6bd89195}</Project>
             <Name>Promul.Common</Name>
         </ProjectReference>

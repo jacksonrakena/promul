@@ -19,8 +19,8 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Common\Promul.Common.csproj" />
-      <ProjectReference Include="..\Server~\Promul.Server.csproj" />
+      <ProjectReference Include="..\..\src\Promul.Common\Promul.Common.csproj" />
+      <ProjectReference Include="..\..\src\Promul.Server~\Promul.Server.csproj" />
     </ItemGroup>
 
 </Project>

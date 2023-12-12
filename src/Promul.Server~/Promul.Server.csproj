@@ -18,13 +18,13 @@
         <Content Include="..\.dockerignore">
             <Link>.dockerignore</Link>
         </Content>
-        <Content Include="..\README.md">
+        <Content Include="..\..\README.md">
             <Link>README.md</Link>
         </Content>
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Common\Promul.Common.csproj"/>
+        <ProjectReference Include="..\Promul.Common\Promul.Common.csproj"/>
     </ItemGroup>
 
 </Project>
