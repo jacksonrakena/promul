@@ -28,7 +28,7 @@ You should now be ready to use Promul as a relay server for your Unity project. 
 ```mermaid
 flowchart TD
     subgraph "Protocol layer"
-    A[Your Unity code] -->|Unity Netcode| B[Promul.Runtime]
+    A[Your Unity code] -->|Unity Netcode| B[Promul.Runtime.Unity]
     end
     subgraph Transit layer
     B --> C[Promul.Common\nKey networking capabilities]
