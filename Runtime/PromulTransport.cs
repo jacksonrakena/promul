@@ -77,14 +77,14 @@ namespace Promul.Runtime
         
         public override void Send(ulong clientId, ArraySegment<byte> data, NetworkDelivery qos)
         {
-            Debug.Log("Sending to " + clientId + ": " + string.Join(" ", data.Select(e => e.ToString("X2"))));
+            byte[] sd = data.ToArray();
             Task.Run(async () =>
             {
                 await SendControl(new RelayControlMessage
                 {
                     Type = RelayControlMessageType.Data,
                     AuthorClientId = clientId,
-                    Data = data
+                    Data = sd
                 }, qos);
             });
         }
@@ -93,7 +93,6 @@ namespace Promul.Runtime
         {
             var message = reader.ReadRelayControlMessage();
             var author = message.AuthorClientId;
-            Debug.Log($"Receive from {peer.Id} author={author} type={message.Type:G}");
             switch (message.Type)
             {
                 // Either we are host and a client has connected,
@@ -112,10 +111,9 @@ namespace Promul.Runtime
                 // Relayed data
                 case RelayControlMessageType.Data:
                 {
-                    Debug.Log("Data: " + string.Join(" ", message.Data.Select(e => e.ToString("X2"))));
                     var data = new byte[message.Data.Count];
                     message.Data.CopyTo(data);
-                    _queue.Enqueue((NetworkEvent.Data, author, data));
+                    _queue.Enqueue((NetworkEvent.Data, author, message.Data));
                         break;
                 }
                 case RelayControlMessageType.KickFromRelay:

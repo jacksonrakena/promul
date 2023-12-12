@@ -309,6 +309,7 @@ namespace Promul.Common.Networking
             {
                 result = await socket.SendToAsync(data, SocketFlags.None, remoteEndPoint);
             }
+            catch (NullReferenceException){}
             catch (SocketException ex)
             {
                 switch (ex.SocketErrorCode)

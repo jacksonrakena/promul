@@ -678,7 +678,7 @@ namespace Promul.Common.Networking
             //if (mergedPacketSize + splitThreshold >= MaximumTransferUnit)
             //{
             await PromulManager.RawSendAsync(packet, EndPoint);
-            LogDebug($"[Send] {packet.Property} ({packet.Data.Count} bytes) (sequence {packet.Sequence})");
+            //LogDebug($"[Send] {packet.Property} ({packet.Data.Count} bytes) (sequence {packet.Sequence})");
             //}
             // if (_mergePos + mergedPacketSize > MaximumTransferUnit) await SendMerged();
             //

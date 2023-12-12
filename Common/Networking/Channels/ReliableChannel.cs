@@ -118,7 +118,7 @@ namespace Promul.Common.Networking.Channels
                     _pendingPackets[pendingIdx] = p;
                     if (r)
                     {
-                        Peer.LogDebug($"[Packet {packet.Sequence}] Correct ack for {pendingSeq}");
+                        //Peer.LogDebug($"[Packet {packet.Sequence}] Correct ack for {pendingSeq}");
                     }
                 }
             }
@@ -184,8 +184,6 @@ namespace Promul.Common.Networking.Channels
                     var p = _pendingPackets[pendingSeq % _windowSize];
                     var sendSeq = await p.TrySendAsync(currentTime, Peer);
                     _pendingPackets[pendingSeq % _windowSize] = p;
-                    //var sendSeq = await _pendingPackets[pendingSeq % _windowSize].TrySendAsync(currentTime, Peer);
-                    Peer.LogDebug("Trying to send sequence number " + pendingSeq + ": " + sendSeq);
                     if (sendSeq)
                     {
                         hasPendingPackets = true;
@@ -295,7 +293,7 @@ namespace Promul.Common.Networking.Channels
             //detailed check
             if (seq == _remoteSequence)
             {
-                Peer.LogDebug($"[Receive] {packet.Property} ({packet.Data.Count} bytes) (sequence {packet.Sequence})");
+                //Peer.LogDebug($"[Receive] {packet.Property} ({packet.Data.Count} bytes) (sequence {packet.Sequence})");
                 await Peer.AddReliablePacket(_deliveryMethod, packet);
                 _remoteSequence = (_remoteSequence + 1) % NetConstants.MaxSequence;
 

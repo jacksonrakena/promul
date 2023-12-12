@@ -1,16 +1,17 @@
 ﻿using Promul.Common.Networking;
 using Promul.Common.Networking.Data;
 using Promul.Common.Structs;
-
 namespace Promul.Server.Relay.Sessions;
 
 public class RelaySession
 {
-    private readonly Dictionary<int, PeerBase> _connections = new();
+    readonly Dictionary<int, PeerBase> _connections = new Dictionary<int, PeerBase>();
+    int? host = null;
+    public PeerBase? HostPeer => host != null ? _connections[host.Value] : null;
+    public string JoinCode { get; }
 
-    private readonly ILogger<RelaySession> _logger;
-    private readonly RelayServer _server;
-    private int? host;
+    readonly ILogger<RelaySession> _logger;
+    readonly RelayServer _server;
 
     public RelaySession(string joinCode, RelayServer server, ILogger<RelaySession> logger)
     {
@@ -19,27 +20,20 @@ public class RelaySession
         _server = server;
     }
 
-    public PeerBase? HostPeer => host != null ? _connections[host.Value] : null;
-    public string JoinCode { get; }
-
     public IEnumerable<PeerBase> Peers => _connections.Values;
 
     public async Task OnReceive(PeerBase from, RelayControlMessage message, DeliveryMethod method)
     {
-        if (!_connections.TryGetValue((int)message.AuthorClientId, out var dest))
+        if (!_connections.TryGetValue((int) message.AuthorClientId, out var dest))
         {
-            LogInformation(
-                $"{from.Id} tried to send information to {message.AuthorClientId}, but {message.AuthorClientId} is not connected to the relay.");
+            LogInformation($"{from.Id} tried to send information to {message.AuthorClientId}, but {message.AuthorClientId} is not connected to the relay.");
             return;
         }
 
         switch (message.Type)
         {
             case RelayControlMessageType.Data:
-                await SendAsync(dest,
-                    new RelayControlMessage
-                        { Type = RelayControlMessageType.Data, AuthorClientId = (ulong)from.Id, Data = message.Data },
-                    method);
+                await SendAsync(dest, new RelayControlMessage { Type = RelayControlMessageType.Data, AuthorClientId = (ulong)from.Id, Data = message.Data }, method);
                 break;
             case RelayControlMessageType.KickFromRelay:
                 var target = message.AuthorClientId;
@@ -52,11 +46,7 @@ public class RelaySession
                         LogInformation($"Host {from.Id} successfully kicked {target}");
                     }
                 }
-                else
-                {
-                    LogInformation($"Client {from.Id} tried to illegally kick {target}!");
-                }
-
+                else LogInformation($"Client {from.Id} tried to illegally kick {target}!");
                 break;
             case RelayControlMessageType.Connected:
             case RelayControlMessageType.Disconnected:
@@ -64,15 +54,14 @@ public class RelaySession
                 LogInformation($"Ignoring invalid message {message.Type:G} from {from.Id}");
                 break;
         }
+
     }
 
     private async Task SendAsync(PeerBase to, RelayControlMessage message, DeliveryMethod method)
     {
         var writer = CompositeWriter.Create();
         writer.Write(message);
-        _logger.LogInformation(
-            $"Sending {message.Type} ({message.Data.Count} bytes) from {message.AuthorClientId} to {to.Id}");
-        await to.SendAsync(writer, method);
+        await to.SendAsync(writer, deliveryMethod: method);
     }
 
     public async Task OnJoinAsync(PeerBase peer)
@@ -86,18 +75,18 @@ public class RelaySession
         else
         {
             LogInformation($"{peer.Id} has joined");
-
-            await SendAsync(HostPeer!, new RelayControlMessage
+            
+            await SendAsync(HostPeer!, new RelayControlMessage()
             {
                 Type = RelayControlMessageType.Connected,
-                AuthorClientId = (ulong)peer.Id,
+                AuthorClientId = (ulong) peer.Id,
                 Data = Array.Empty<byte>()
             }, DeliveryMethod.ReliableOrdered);
-
+            
             await SendAsync(peer, new RelayControlMessage
             {
                 Type = RelayControlMessageType.Connected,
-                AuthorClientId = (ulong)host!,
+                AuthorClientId = (ulong) host!,
                 Data = Array.Empty<byte>()
             }, DeliveryMethod.ReliableOrdered);
         }
@@ -116,30 +105,31 @@ public class RelaySession
                 await _server.DestroySession(this);
                 return;
             }
-
             if (host != null)
+            {
                 await SendAsync(HostPeer!, new RelayControlMessage
                 {
                     Type = RelayControlMessageType.Disconnected,
-                    AuthorClientId = (ulong)peer.Id,
+                    AuthorClientId = (ulong) peer.Id,
                     Data = Array.Empty<byte>()
                 }, DeliveryMethod.ReliableOrdered);
+            }   
         }
     }
 
     public async Task DisconnectAll()
     {
-        foreach (var con in _connections.Values) await _server.PromulManager.DisconnectPeerAsync(con);
+        foreach (var con in _connections.Values)
+        {
+            await this._server.PromulManager.DisconnectPeerAsync(con);
+        }
         _connections.Clear();
     }
-
+    
     private void LogInformation(string message)
     {
         _logger.LogInformation("[{}] {}", this, message);
     }
 
-    public override string ToString()
-    {
-        return $"Session {JoinCode}";
-    }
+    public override string ToString() => $"Session {this.JoinCode}";
 }
