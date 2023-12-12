@@ -1,4 +1,4 @@
-namespace Promul.Server.Models.Sessions;
+namespace Promul.Relay.Server.Models.Sessions;
 
 public struct SessionInfo
 {

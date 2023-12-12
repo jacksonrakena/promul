@@ -1,8 +1,7 @@
 using System.Net;
 using System.Text;
-using Promul.Common.Networking;
-using Promul.Common.Networking.Data;
 using Terminal.Gui;
+namespace Promul.Demo;
 
 public enum State
 {
@@ -141,7 +140,7 @@ public class Program : Window
             var str = m.ReadString();
             //var data = m.ReadBytes(int.MaxValue);
             WriteMessage(p.Id + ": " +
-                              /*string.Join(" ", data.Select(e => e.ToString("X"))*/str);
+                /*string.Join(" ", data.Select(e => e.ToString("X"))*/str);
         };
 
     }

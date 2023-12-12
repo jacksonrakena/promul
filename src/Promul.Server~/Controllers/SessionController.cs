@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
-using Promul.Server.Models.Sessions;
-using Promul.Server.Relay;
+using Promul.Relay.Server.Models.Sessions;
+using Promul.Relay.Server.Relay;
 
-namespace Promul.Server.Controllers;
+namespace Promul.Relay.Server.Controllers;
 
 [ApiController]
 [Route("[controller]")]

@@ -1,6 +1,6 @@
 ﻿using System.Net;
 
-namespace Promul.Server.Relay;
+namespace Promul.Relay.Server.Relay;
 
 public class RelayServerHostedService : BackgroundService
 {

@@ -1,5 +1,4 @@
-using Promul.Server.Relay;
-
+using Promul.Relay.Server.Relay;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -30,6 +29,9 @@ app.MapRazorPages();
 
 app.Run();
 
-public partial class Program
+namespace Promul.Relay.Server
 {
+    public partial class Program
+    {
+    }
 }

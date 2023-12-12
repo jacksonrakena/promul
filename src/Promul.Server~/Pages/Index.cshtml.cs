@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc.RazorPages;
 
-namespace Promul.Server.Pages;
+namespace Promul.Relay.Server.Pages;
 
 public class Index : PageModel
 {

@@ -1,8 +1,4 @@
 using System.Net;
-using System.Text;
-using Promul.Common.Networking;
-using Promul.Common.Networking.Data;
-
 namespace Promul.Tests.Contexts;
 
 public class ManagerGroup : IDisposable

@@ -3,7 +3,9 @@
   "rootNamespace": "Promul.Runtime",
   "references": [
     "GUID:1a708d929450cf244aefd140b1190d9a",
-    "Unity.Netcode.Runtime"
+    "Unity.Netcode.Runtime",
+    "Promul.Relay.Protocol",
+    "Promul"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

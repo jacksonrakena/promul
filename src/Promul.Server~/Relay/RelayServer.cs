@@ -1,9 +1,7 @@
-﻿using Promul.Common.Networking;
-using Promul.Common.Networking.Data;
-using Promul.Common.Structs;
-using Promul.Server.Relay.Sessions;
+﻿using Promul.Relay.Protocol;
+using Promul.Relay.Server.Relay.Sessions;
 
-namespace Promul.Server.Relay;
+namespace Promul.Relay.Server.Relay;
 
 public class RelayServer
 {

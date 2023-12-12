@@ -1,8 +1,8 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Promul.Server", "src\Promul.Server~\Promul.Server.csproj", "{EDB23D95-CCE1-4B0A-A5E0-B25383D6F647}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Promul.Relay.Server", "src\Promul.Server~\Promul.Relay.Server.csproj", "{EDB23D95-CCE1-4B0A-A5E0-B25383D6F647}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Promul.Common", "src\Promul.Common\Promul.Common.csproj", "{009A3A68-30A0-44EB-9B42-8FCB6BD89195}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Promul", "src\Promul\Promul.csproj", "{009A3A68-30A0-44EB-9B42-8FCB6BD89195}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Promul.Runtime.Unity", "src\Promul.Runtime.Unity\Promul.Runtime.Unity.csproj", "{29457397-4CEF-4E36-92C7-F3E1101CDBA7}"
 EndProject
@@ -13,6 +13,10 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{5CFD38E1-CF86-4A60-BCF1-CAEAC3CE9CB6}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Promul.Tests", "test~\Promul.Tests\Promul.Tests.csproj", "{EEFB6A7C-9228-4ED6-9EFF-139BBFE666C4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Promul.Server.Tests", "test~\Promul.Server.Tests\Promul.Server.Tests.csproj", "{3F615955-4CC6-4AB2-BBEE-1171D9CD5B08}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Promul.Relay.Protocol", "src\Promul.Relay.Protocol\Promul.Relay.Protocol.csproj", "{C1F72513-F67A-4D09-989A-43D8A9E68D80}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -40,6 +44,14 @@ Global
 		{EEFB6A7C-9228-4ED6-9EFF-139BBFE666C4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EEFB6A7C-9228-4ED6-9EFF-139BBFE666C4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EEFB6A7C-9228-4ED6-9EFF-139BBFE666C4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3F615955-4CC6-4AB2-BBEE-1171D9CD5B08}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3F615955-4CC6-4AB2-BBEE-1171D9CD5B08}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3F615955-4CC6-4AB2-BBEE-1171D9CD5B08}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3F615955-4CC6-4AB2-BBEE-1171D9CD5B08}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C1F72513-F67A-4D09-989A-43D8A9E68D80}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C1F72513-F67A-4D09-989A-43D8A9E68D80}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C1F72513-F67A-4D09-989A-43D8A9E68D80}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C1F72513-F67A-4D09-989A-43D8A9E68D80}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{2632B8FD-FA5A-4CE1-9A27-09C6D6A3BF34} = {3CDF6417-B41A-4C8A-8697-51002424935B}
@@ -47,5 +59,7 @@ Global
 		{29457397-4CEF-4E36-92C7-F3E1101CDBA7} = {5CFD38E1-CF86-4A60-BCF1-CAEAC3CE9CB6}
 		{EDB23D95-CCE1-4B0A-A5E0-B25383D6F647} = {5CFD38E1-CF86-4A60-BCF1-CAEAC3CE9CB6}
 		{EEFB6A7C-9228-4ED6-9EFF-139BBFE666C4} = {3CDF6417-B41A-4C8A-8697-51002424935B}
+		{3F615955-4CC6-4AB2-BBEE-1171D9CD5B08} = {3CDF6417-B41A-4C8A-8697-51002424935B}
+		{C1F72513-F67A-4D09-989A-43D8A9E68D80} = {5CFD38E1-CF86-4A60-BCF1-CAEAC3CE9CB6}
 	EndGlobalSection
 EndGlobal
