@@ -22,6 +22,6 @@ jobs:
     - name: Build
       run: dotnet build test~/Promul.Tests/Promul.Tests.csproj --no-restore && dotnet build test~/Promul.Server.Tests/Promul.Server.Tests.csproj --no-restore
     - name: Test core
-      run: dotnet test test~/Promul.Tests/Promul.Tests.csproj--no-build --verbosity normal
+      run: dotnet test test~/Promul.Tests/Promul.Tests.csproj --no-build --verbosity normal
     - name: Test server
-      run: dotnet test test~/Promul.Server.Tests/Promul.Server.Tests.csproj--no-build --verbosity normal
+      run: dotnet test test~/Promul.Server.Tests/Promul.Server.Tests.csproj --no-build --verbosity normal
